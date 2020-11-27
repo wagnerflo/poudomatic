@@ -1,0 +1,21 @@
+{% set category,portname = pkg.name.split('/', 1) -%}
+# $FreeBSD$
+
+PORTNAME=	{{ portname }}
+CATEGORIES=	{{ category }}
+PORTVERSION=	{{ pkg.version|trim }}
+
+DISTFILES=      {{ distfile.name }}
+NO_WRKSUBDIR=	yes
+
+MAINTAINER=	poudomatic
+
+{% block after_header %}{% endblock %}
+
+.include <bsd.port.options.mk>
+
+{% block after_options %}{% endblock %}
+
+.include <bsd.port.mk>
+
+{%- block end %}{% endblock %}

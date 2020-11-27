@@ -1,0 +1,10 @@
+{%- if config.data is defined -%}
+{%- for file,dest in config.data.items() -%}
+{{ dest }}
+{% endfor %}
+{% endif -%}
+{%- if config.symlink is defined -%}
+{%- for src,dest in config.symlink.items() -%}
+{{ src }}
+{% endfor -%}
+{% endif -%}

@@ -1,0 +1,24 @@
+{% extends "Makefile.base.tmpl" -%}
+
+{% macro prepend_prefix(path) -%}
+{% if path[0] == '/' %}{{ path }}{% else %}${PREFIX}/{{ path }}{% endif %}
+{%- endmacro %}
+
+{% block after_options %}
+do-build:
+#	do nothing
+
+do-install:
+{%- if config.data is defined %}
+{%- for file,dest in config.data.items() %}
+	${MKDIR} ${STAGEDIR}{{ prepend_prefix(dest|dirname) }}
+	${INSTALL_DATA} ${WRKSRC}/{{ file }} ${STAGEDIR}{{ prepend_prefix(dest) }}
+{%- endfor %}
+{%- endif %}
+{%- if config.symlink is defined %}
+{%- for src,dest in config.symlink.items() %}
+	${MKDIR} ${STAGEDIR}{{ prepend_prefix(src|dirname) }}
+	${RLN} ${STAGEDIR}{{ prepend_prefix(dest) }} ${STAGEDIR}{{ prepend_prefix(src) }}
+{%- endfor %}
+{%- endif %}
+{% endblock %}

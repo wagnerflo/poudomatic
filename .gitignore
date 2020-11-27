@@ -1,0 +1,7 @@
+.pyenv/
+__pycache__/
+*.pyc
+build/
+dist/
+poudomatic/libpkg.so
+poudomatic.egg-info/
