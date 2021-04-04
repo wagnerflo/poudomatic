@@ -13,10 +13,7 @@ async def create_ports(env, args):
     await env.create_ports(args.branch)
 
 async def run_build(env, args):
-    jail = await env.get_jail(args.jail)
-    ports = await env.get_ports(args.ports)
-    async with ports.install() as portsname:
-        pass
+    await env.build(args.jail, args.ports, args.target)
 
 async def run(args):
     rt = await ConsoleRuntime.new()

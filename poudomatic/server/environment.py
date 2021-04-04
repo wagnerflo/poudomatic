@@ -25,6 +25,7 @@ from .properties import (
 )
 from .jail import Jail
 from .ports import Ports
+from .build import Build
 
 class Poudriere:
     def __init__(self, etc_path):
@@ -176,3 +177,6 @@ class Environment:
 
     async def get_ports(self, branch):
         return await Ports.get(self, branch)
+
+    async def build(self, jail_version, ports_branch, target):
+        await Build(self, jail_version, ports_branch, target)
