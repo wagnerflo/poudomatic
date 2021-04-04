@@ -1,0 +1,7 @@
+__pycache__/
+worker/build/*
+worker/.pyenv/*
+!worker/.pyenv/.keep
+client/build/*
+client/.pyenv/*
+!client/.pyenv/.keep
