@@ -1,0 +1,8 @@
+POUDOMATIC = "poudomatic"
+POUDRIERE = "poudriere"
+
+POUDOMATIC_ENVIRONMENT = f"{POUDOMATIC}:environment"
+POUDOMATIC_TIMESTAMP   = f"{POUDOMATIC}:timestamp"
+POUDOMATIC_GITSHA      = f"{POUDOMATIC}:gitsha"
+
+POUDRIERE_TYPE = f"{POUDRIERE}:type"
