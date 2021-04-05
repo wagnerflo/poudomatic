@@ -59,7 +59,7 @@ class Ports:
 
             )
             try:
-                yield name
+                yield dset,name
             finally:
                 await self.env.poudriere.forget_ports(name)
 

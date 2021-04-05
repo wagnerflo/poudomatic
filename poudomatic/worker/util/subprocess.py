@@ -29,6 +29,11 @@ class process:
         self.pipe_to.append(func)
         return self
 
+    @property
+    def stdin_lines(self):
+        for line in self.stdin:
+            yield f"{line}\n".encode()
+
     async def _check_exit(self, err):
         if await self.proc.wait() not in self.exit_ok:
             raise Exception(err)
@@ -42,8 +47,16 @@ class process:
         except CancelledError:
             pass
 
+    async def _write_stdin(self, stream):
+        if self.stdin:
+            stream.writelines(self.stdin_lines)
+            await stream.drain()
+            stream.close()
+            await stream.wait_closed()
+
     async def _redirector(self):
         await wait_aws((
+            create_task(self._write_stdin(self.proc.stdin)),
             create_task(self._redirect_to(self.proc.stdout)),
             create_task(self._redirect_to(self.proc.stderr)),
         ))
@@ -51,7 +64,7 @@ class process:
 
     async def _waiter(self):
         stdout,stderr = await self.proc.communicate(
-            '\n'.join(self.stdin).encode() if self.stdin else None
+            b''.join(self.stdin_lines) if self.stdin else None
         )
         await self._check_exit(stderr.decode())
         return stdout.decode()

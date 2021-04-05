@@ -1,44 +1,6 @@
-from abc import ABC,abstractmethod
-from re import compile as regex
-from tempfile import mkdtemp
-from urllib.parse import urlparse
-from ..common import to_thread
-
-class Target(ABC):
-    _registry = []
-
-    @classmethod
-    async def fetch(cls, uri):
-        scheme = urlparse(uri).scheme
-        for re,cls in cls._registry:
-            if re.match(scheme):
-                return await cls.new(uri)
-        raise Exception()
-
-    @classmethod
-    def __init_subclass__(cls, /, scheme, **kwargs):
-        super().__init_subclass__(**kwargs)
-        cls._registry.append((regex(scheme), cls))
-
-    @classmethod
-    async def new(cls, uri):
-        self = cls()
-        self.uri = uri
-        return self
-
-    @abstractmethod
-    async def cleanup(self):
-        pass
-
-class FileTarget(Target, scheme=r"^file$"):
-    @classmethod
-    async def new(cls, uri):
-        self = await super().new(uri)
-        # self = cls()
-        return self
-
-    async def cleanup(self):
-        pass
+from pathlib import Path
+from ..common import mkdir
+from .target import Target
 
 class Build:
     def __init__(self, env, jail_version, ports_branch, target_uri):
@@ -50,16 +12,34 @@ class Build:
     def __await__(self):
         return self.run().__await__()
 
+    async def mkport(self, workdir, target):
+        pass
+
     async def run(self):
         env = self.env
         jail = await env.get_jail(self.jail_version)
         ports = await env.get_ports(self.ports_branch)
+        targets = {}
 
-        target = await Target.fetch(self.target_uri)
-        targets = { target.uri: target }
-        # repo = Repository.clone_from_url(args.repository, config_context)
-        # repos = { repo.url: repo }
+        async with ports.install() as (portsfs, portsname):
+            portsdir = Path(portsfs.mountpoint)
+            workdir = portsdir / "POUDOMATIC"
+            await mkdir(workdir)
 
-        # async with ports.install() as portsname:
-        #     async with jail.start() as j:
-        #         pass
+            try:
+                target = await Target.fetch(self.target_uri, workdir)
+                targets[target.key] = target
+
+                async with jail.start(portsname) as jexec:
+                    await (
+                        await (
+                            jexec("/bin/ls", "-l", "/usr/ports/POUDOMATIC")
+                            >> env.runtime.log
+                        )
+                    )
+                    import asyncio
+                    await asyncio.sleep(600)
+
+            finally:
+                for target in targets.values():
+                    await target.cleanup()

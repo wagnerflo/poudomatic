@@ -1,6 +1,10 @@
+from contextlib import asynccontextmanager
 from dataclasses import dataclass,field,InitVar
 from re import compile as regex, VERBOSE
-from .util import zfs
+from shlex import quote as shquote
+
+from ..common import tempnames
+from .util import zfs,process
 
 VERSION_RE = regex(
     r"""
@@ -51,18 +55,58 @@ class JailVersion:
             f"{0 if self.level is None else self.level}"
         )
 
+class JailExec:
+    def __init__(self, jailname):
+        self.cmd = ("/usr/sbin/jexec", "-U", "root", shquote(jailname))
+
+    def __call__(self, *args):
+        return process(*self.cmd + args)
+
 class Jail:
     FSPROPS = zfs.COMPRESSION + zfs.NOATIME
 
-    def __init__(self, dataset):
+    def __init__(self, env, dataset):
+        self.env = env
         self.dset = dataset
+
+    @asynccontextmanager
+    async def start(self, portsname):
+        _,_,jailname = self.dset.name.rpartition("/")
+        mastername = next(tempnames)
+        await (
+            await (
+                self.env.poudriere.api() << (
+                    f"export SET_STATUS_ON_START=0",
+                    f"export MUTABLE_BASE=yes",
+                    f"export MASTERNAME={shquote(mastername)}",
+                    f"_mastermnt MASTERMNT",
+                    f"export MASTERMNT",
+                    f"jail_start {shquote(jailname)} {shquote(portsname)}",
+                )
+                >> self.env.runtime.log
+            )
+        )
+        try:
+            yield JailExec(mastername)
+        finally:
+            await (
+                await (
+                    self.env.poudriere.api() << (
+                        f"export MASTERNAME={shquote(mastername)}",
+                        f"_mastermnt MASTERMNT",
+                        f"export MASTERMNT",
+                        f"jail_stop",
+                    )
+                    >> self.env.runtime.log
+                )
+            )
 
     @classmethod
     async def get(cls, env, version):
         ver = JailVersion(version)
         name = f"{env.dset_jails.name}/{ver.shortname}"
         if (dset := await zfs.get_dataset(name)) is not None:
-            return cls(dset)
+            return cls(env, dset)
 
     @classmethod
     async def _upgrade_dset(cls, env, dset):
@@ -105,4 +149,4 @@ class Jail:
             await env.poudriere.jset(name, mnt=dset.mountpoint, method="null")
             await env.poudriere.rename_jail_conf(name, newname)
 
-        return cls(dset)
+        return cls(env, dset)

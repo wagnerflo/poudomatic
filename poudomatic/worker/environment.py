@@ -12,17 +12,17 @@ from .build import Build
 
 class Poudriere:
     def __init__(self, etc_path):
-        self.path_conf    = etc_path / 'poudriere.conf'
-        self.path_d       = etc_path / 'poudriere.d'
-        self.path_jails_d = self.path_d / 'jails'
-        self.path_ports_d = self.path_d / 'ports'
-        self.cmd = ('/usr/local/bin/poudriere', '-e', str(etc_path))
+        self.path_conf    = etc_path / "poudriere.conf"
+        self.path_d       = etc_path / "poudriere.d"
+        self.path_jails_d = self.path_d / "jails"
+        self.path_ports_d = self.path_d / "ports"
+        self.cmd = ("/usr/local/bin/poudriere", "-e", str(etc_path))
 
     def __call__(self, *args):
         return process(*self.cmd + args)
 
     def api(self):
-        return self('api')
+        return self("api")
 
     async def _prop_get(self, func, name, prop):
         return await (await (self.api() << f"{func} {name} {prop}"))
@@ -38,23 +38,23 @@ class Poudriere:
         )
 
     async def jget(self, name, prop):
-        return await self._prop_get('jget', name, prop)
+        return await self._prop_get("jget", name, prop)
 
     async def jset(self, name, **props):
-        await self._prop_set('jset', name, **props)
+        await self._prop_set("jset", name, **props)
 
     async def pget(self, name, prop):
-        return await self._prop_get('pget', name, prop)
+        return await self._prop_get("pget", name, prop)
 
     async def pset(self, name, **props):
-        await self._prop_set('pset', name, **props)
+        await self._prop_set("pset", name, **props)
 
     @to_thread
     def rename_jail_conf(self, name, newname):
         (self.path_jails_d / name).rename(self.path_jails_d / newname)
 
     async def remember_ports(self, name, mnt, timestamp):
-        await self.pset(name, mnt=mnt, method='null', timestamp=timestamp)
+        await self.pset(name, mnt=mnt, method="null", timestamp=timestamp)
 
     @to_thread
     def forget_ports(self, name):
@@ -62,9 +62,9 @@ class Poudriere:
 
     def write_conf(self, dset):
         tmpl = Template(
-            resource_string(__name__, 'poudriere.conf').decode()
+            resource_string(__name__, "poudriere.conf").decode()
         )
-        zpool,sep,zrootfs = dset.name.partition('/')
+        zpool,sep,zrootfs = dset.name.partition("/")
         self.path_conf.write_text(
             tmpl.substitute(
                 ZPOOL   = zpool,
@@ -78,16 +78,16 @@ class Environment:
     VERSION = 1
 
     DATASETS = (
-        ( '.m',        None            ),
-        ( 'cache',     None            ),
-        ( 'ccache',    zfs.COMPRESSION ),
-        ( 'distfiles', None            ),
-        ( 'etc',       zfs.COMPRESSION ),
-        ( 'jails',     None            ),
-        ( 'logs',      None            ),
-        ( 'ports',     zfs.COMPRESSION ),
-        ( 'packages',  None            ),
-        ( 'wrkdirs',   None            ),
+        ( ".m",        None            ),
+        ( "cache",     None            ),
+        ( "ccache",    zfs.COMPRESSION ),
+        ( "distfiles", None            ),
+        ( "etc",       zfs.COMPRESSION ),
+        ( "jails",     None            ),
+        ( "logs",      None            ),
+        ( "ports",     zfs.COMPRESSION ),
+        ( "packages",  None            ),
+        ( "wrkdirs",   None            ),
     )
 
     @classmethod
@@ -106,7 +106,7 @@ class Environment:
 
         self.dset = dset
         self.path = Path(dset.mountpoint)
-        self.etc_path = self.path / 'etc'
+        self.etc_path = self.path / "etc"
         self.poudriere = Poudriere(self.etc_path)
 
         if (version := zfs.get_property(dset, cls.PROPERTY)) is None:

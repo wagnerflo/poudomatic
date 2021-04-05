@@ -84,7 +84,7 @@ def main():
     build.add_argument(
         "target",
         help=(
-            "URI of a target to build. Supported protocols are file:// "
+            "URI of a target to build. Supported protocols are file:PATH "
             "(plain directory) and git+[GITURL] (Git repository cloneable "
             "from GITURL)."
         ),
