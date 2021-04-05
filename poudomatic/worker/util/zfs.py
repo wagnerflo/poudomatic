@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from itertools import chain
 from libzfs import (
     DatasetType as ZFSDatasetType,
     Error as ZFSErrorCode,
@@ -6,26 +7,12 @@ from libzfs import (
     ZFSUserProperty,
     ZFSException,
 )
-from random import choices
-from .util import to_thread
-
-def _tempnames():
-    while True:
-        yield "".join(
-            choices("abcdefghijklmnopqrstuvwxyz0123456789_", k=8)
-        )
+from ...common import (
+    to_thread,
+    tempnames,
+)
 
 _zfs = ZFS()
-get_pool = to_thread(_zfs.get)
-get_dataset = to_thread(_zfs.get_dataset)
-get_snapshot = to_thread(_zfs.get_snapshot)
-create_dataset = to_thread(_zfs.create)
-
-@to_thread
-def create_snapshot(dset, name):
-    name = f"{dset.name}@{name}"
-    dset.snapshot(name)
-    return _zfs.get_snapshot(name)
 
 @to_thread
 def get_dataset(name):
@@ -36,27 +23,19 @@ def get_dataset(name):
             raise
 
 @to_thread
-def set_properties(dataset, props):
-    for key,value in props.items():
-        dataset.properties[key] = ZFSUserProperty(str(value))
-
-def is_filesystem(dataset):
-    return dataset.type == ZFSDatasetType.FILESYSTEM
-
-@to_thread
-def create_dataset(name, fsprops={}, mount=True):
+def create_dataset(name, fsprops=None, mount=True):
     pool,_,_ = name.partition('/')
     pool = _zfs.get(pool)
-    pool.create(name, fsprops)
+    pool.create(name, fsprops or {})
     dset = _zfs.get_dataset(name)
     if mount:
         dset.mount()
     return dset
 
 @to_thread
-def find_dataset(root, fsprops={}):
-    for child in root.children_recursive:
-        print(child)
+def rename_dataset(dset, newname):
+    dset.rename(newname)
+    return _zfs.get_dataset(newname)
 
 @to_thread
 def destroy_dataset(name):
@@ -69,9 +48,30 @@ def destroy_dataset(name):
     dset.delete()
 
 @to_thread
-def rename_dataset(dset, newname):
-    dset.rename(newname)
-    return _zfs.get_dataset(newname)
+def set_properties(dset, props):
+    for key,value in props.items():
+        dset.properties[key] = ZFSUserProperty(str(value))
+
+def get_property(dset, prop):
+    if (prop := dset.properties.get(prop)) is not None:
+        return prop.value
+
+def is_filesystem(dset):
+    return dset.type == ZFSDatasetType.FILESYSTEM
+
+@to_thread
+def get_snapshot(name):
+    try:
+        return _zfs.get_snapshot(name)
+    except ZFSException as exc:
+        if exc.code != ZFSErrorCode.NOENT:
+            raise
+
+@to_thread
+def create_snapshot(dset, name):
+    name = f"{dset.name}@{name}"
+    dset.snapshot(name)
+    return _zfs.get_snapshot(name)
 
 @to_thread
 def sorted_snapshots(dset, key=None, reverse=False):
@@ -80,16 +80,16 @@ def sorted_snapshots(dset, key=None, reverse=False):
     return sorted(dset.snapshots, key=key, reverse=reverse)
 
 @to_thread
-def create_clone(snap, name, fsprops={}, mount=True):
-    snap.clone(name, fsprops)
+def create_clone(snap, name, fsprops=None, mount=True):
+    snap.clone(name, fsprops or {})
     dset = _zfs.get_dataset(name)
     if mount:
         dset.mount()
     return dset
 
 @asynccontextmanager
-async def temp_dataset(root, fsprops={}, mount=True):
-    for name in _tempnames():
+async def temp_dataset(root, fsprops=None, mount=True):
+    for name in tempnames:
         try:
             name = f"{root.name}/{name}"
             dset = await create_dataset(name, fsprops=fsprops, mount=mount)
@@ -107,9 +107,9 @@ async def temp_dataset(root, fsprops={}, mount=True):
                 raise
 
 @asynccontextmanager
-async def temp_clone(snap, fsprops={}, mount=True):
+async def temp_clone(snap, fsprops=None, mount=True):
     prefix = snap.parent.name
-    for name in _tempnames():
+    for name in tempnames:
         try:
             name = f"{prefix}/{name}"
             dset = await create_clone(snap, name, fsprops=fsprops, mount=mount)
@@ -126,6 +126,10 @@ async def temp_clone(snap, fsprops={}, mount=True):
             if exc.code != ZFSErrorCode.NOENT:
                 raise
 
-COMPRESSION   = { 'compression': 'zstd' }
-NOCOMPRESSION = { 'compression': 'off'  }
-NOATIME       = { 'atime':       'off'  }
+class props(dict):
+    def __add__(self, other):
+        return self.__class__(chain(self.items(), other.items()))
+
+COMPRESSION   = props( compression = 'zstd' )
+NOCOMPRESSION = props( compression = 'off'  )
+NOATIME       = props( atime       = 'off'  )

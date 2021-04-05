@@ -1,28 +1,11 @@
-from asyncio import get_running_loop
 from pathlib import Path
 from pkg_resources import resource_string
 from shlex import quote as shquote
 from shutil import rmtree
 from string import Template
 
-from ..util import (
-    to_thread,
-    process,
-)
-from ..zfs import (
-    get_dataset,
-    set_properties,
-    is_filesystem,
-    create_dataset,
-    COMPRESSION,
-    NOCOMPRESSION,
-)
-
-from .properties import (
-    POUDOMATIC_ENVIRONMENT,
-    POUDOMATIC_TIMESTAMP,
-    POUDRIERE_TYPE,
-)
+from ..common import to_thread
+from .util import zfs,process
 from .jail import Jail
 from .ports import Ports
 from .build import Build
@@ -44,27 +27,34 @@ class Poudriere:
     async def _prop_get(self, func, name, prop):
         return await (await (self.api() << f"{func} {name} {prop}"))
 
-    async def _prop_set(self, func, name, prop, value):
-        await (await (self.api() << f"{func} {name} {prop} {shquote(value)}"))
+    async def _prop_set(self, func, name, **props):
+        await (
+            await (
+                self.api() << (
+                    f"{func} {shquote(name)} {shquote(prop)} {shquote(value)}"
+                    for prop,value in props.items()
+                )
+            )
+        )
 
     async def jget(self, name, prop):
         return await self._prop_get('jget', name, prop)
 
-    async def jset(self, name, prop, value):
-        await self._prop_set('jset', name, prop, value)
+    async def jset(self, name, **props):
+        await self._prop_set('jset', name, **props)
 
-    async def pset(self, name, prop, value):
-        await self._prop_set('pset', name, prop, value)
+    async def pget(self, name, prop):
+        return await self._prop_get('pget', name, prop)
+
+    async def pset(self, name, **props):
+        await self._prop_set('pset', name, **props)
 
     @to_thread
     def rename_jail_conf(self, name, newname):
         (self.path_jails_d / name).rename(self.path_jails_d / newname)
 
-    async def remember_ports(self, name, dset):
-        await self.pset(name, 'mnt', dset.mountpoint)
-        await self.pset(name, 'method', 'null')
-        await self.pset(name, 'timestamp',
-                        dset.properties.get(POUDOMATIC_TIMESTAMP).value)
+    async def remember_ports(self, name, mnt, timestamp):
+        await self.pset(name, mnt=mnt, method='null', timestamp=timestamp)
 
     @to_thread
     def forget_ports(self, name):
@@ -84,45 +74,48 @@ class Poudriere:
         )
 
 class Environment:
-    version = 1
+    PROPERTY = "poudomatic:environment"
+    VERSION = 1
 
     DATASETS = (
-        ('.m',        dict()),
-        ('cache',     dict()),
-        ('ccache',    dict(**COMPRESSION)),
-        ('distfiles', dict()),
-        ('etc',       dict(**COMPRESSION)),
-        ('jails',     dict()),
-        ('logs',      dict()),
-        ('ports',     dict(**COMPRESSION)),
-        ('packages',  dict()),
-        ('wrkdirs',   dict()),
+        ( '.m',        None            ),
+        ( 'cache',     None            ),
+        ( 'ccache',    zfs.COMPRESSION ),
+        ( 'distfiles', None            ),
+        ( 'etc',       zfs.COMPRESSION ),
+        ( 'jails',     None            ),
+        ( 'logs',      None            ),
+        ( 'ports',     zfs.COMPRESSION ),
+        ( 'packages',  None            ),
+        ( 'wrkdirs',   None            ),
     )
 
     @classmethod
     async def new(cls, dataset, runtime):
         self = cls()
-        self.loop = get_running_loop()
         self.runtime = runtime
-        self.dset = await get_dataset(dataset)
 
-        if not is_filesystem(self.dset):
+        if (dset := await zfs.get_dataset(dataset)) is None:
+            raise Exception(f"ZFS dataset '{dataset}' doesn't exist.")
+
+        if not zfs.is_filesystem(dset):
             raise Exception(f"ZFS dataset '{dataset}' is no filesystem.")
 
-        if self.dset.mountpoint is None:
+        if dset.mountpoint is None:
             raise Exception(f"ZFS dataset '{dataset}' is not mounted.")
 
-        self.path = Path(self.dset.mountpoint)
+        self.dset = dset
+        self.path = Path(dset.mountpoint)
         self.etc_path = self.path / 'etc'
         self.poudriere = Poudriere(self.etc_path)
 
-        if (version := self.dset.properties.get(POUDOMATIC_ENVIRONMENT)) is None:
+        if (version := zfs.get_property(dset, cls.PROPERTY)) is None:
             await self.setup()
         else:
-            await self.upgrade(int(version.value))
+            await self.upgrade(int(version))
 
-        self.dset_jails = await get_dataset(f"{dataset}/jails")
-        self.dset_ports = await get_dataset(f"{dataset}/ports")
+        self.dset_jails = await zfs.get_dataset(f"{dataset}/jails")
+        self.dset_ports = await zfs.get_dataset(f"{dataset}/ports")
 
         return self
 
@@ -141,29 +134,29 @@ class Environment:
             )
 
         # disable compression on root dataset
-        set_properties(self.dset, NOCOMPRESSION)
+        zfs.set_properties(self.dset, zfs.NOCOMPRESSION)
 
         # create child datasets
         for name,props in self.DATASETS:
-            create_dataset(f"{self.dset.name}/{name}", props)
+            zfs.create_dataset(f"{self.dset.name}/{name}", props)
 
         # write configuration file for poudriere
         self.poudriere.write_conf(self.dset)
 
         # set properties
-        set_properties(self.dset, {
-            POUDOMATIC_ENVIRONMENT: self.version,
-            POUDRIERE_TYPE:         'data',
+        zfs.set_properties(self.dset, {
+            self.PROPERTY:    self.VERSION,
+            "poudriere:type": "data",
         })
 
     @to_thread
     def upgrade(self, old_version):
-        if old_version == self.version:
+        if old_version == self.VERSION:
             return
 
         self.poudriere.write_conf(self.dset)
 
-        for ver in range(old_version + 1, self.version + 1):
+        for ver in range(old_version + 1, self.VERSION + 1):
             getattr(self, f"upgrade_to_{ver}")()
 
     async def create_jail(self, version):

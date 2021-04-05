@@ -1,13 +1,6 @@
 from dataclasses import dataclass,field,InitVar
 from re import compile as regex, VERBOSE
-
-from ..zfs import (
-    get_dataset,
-    temp_dataset,
-    rename_dataset,
-    COMPRESSION,
-    NOATIME,
-)
+from .util import zfs
 
 VERSION_RE = regex(
     r"""
@@ -59,7 +52,7 @@ class JailVersion:
         )
 
 class Jail:
-    FSPROPS = dict(**COMPRESSION, **NOATIME)
+    FSPROPS = zfs.COMPRESSION + zfs.NOATIME
 
     def __init__(self, dataset):
         self.dset = dataset
@@ -68,7 +61,7 @@ class Jail:
     async def get(cls, env, version):
         ver = JailVersion(version)
         name = f"{env.dset_jails.name}/{ver.shortname}"
-        if (dset := await get_dataset(name)) is not None:
+        if (dset := await zfs.get_dataset(name)) is not None:
             return cls(dset)
 
     @classmethod
@@ -84,14 +77,15 @@ class Jail:
             return jail
 
         # fresh installation
-        async with temp_dataset(env.dset_jails, cls.FSPROPS) as dset:
+        async with zfs.temp_dataset(env.dset_jails, cls.FSPROPS) as dset:
             prefix,_,name = dset.name.rpartition("/")
 
             # install jail and update to latest patch
             await (
                 await (
                     env.poudriere(
-                        "jail", "-c", "-f", "none", "-j", name, "-v", version,
+                        "jail", "-c", "-j", name, "-v", version,
+                        "-f", "none", "-m", "http",
                     )
                     >> env.runtime.log
                 )
@@ -107,8 +101,8 @@ class Jail:
 
             # rename dataset and update mountpoint
             newname = ver.shortname
-            dset = await rename_dataset(dset, f"{prefix}/{newname}")
-            await env.poudriere.jset(name, "mnt", dset.mountpoint)
+            dset = await zfs.rename_dataset(dset, f"{prefix}/{newname}")
+            await env.poudriere.jset(name, mnt=dset.mountpoint, method="null")
             await env.poudriere.rename_jail_conf(name, newname)
 
         return cls(dset)

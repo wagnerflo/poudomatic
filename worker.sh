@@ -2,5 +2,5 @@
 exec \
   sudo \
   PYTHONUSERBASE=$(pwd)/.pyenv \
-  python3 -m poudomatic.server \
+  python3 -m poudomatic.worker \
   "$@"

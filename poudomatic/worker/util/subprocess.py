@@ -1,37 +1,14 @@
 from asyncio import (
-    get_running_loop,
-    run_coroutine_threadsafe,
     create_subprocess_exec,
     create_task,
     wait as wait_aws,
     CancelledError,
 )
-from asyncio.subprocess import DEVNULL,PIPE,STDOUT
-from functools import partial,wraps
-
-def to_thread(func):
-    @wraps(func)
-    def wrapper(*args, **kws):
-        try:
-            loop = get_running_loop()
-        except RuntimeError:
-            loop = None
-        if loop:
-            return loop.run_in_executor(
-                None, partial(func, *args, **kws)
-            )
-        else:
-            return func(*args, **kws)
-    return wrapper
-
-def to_loop(loop, coro):
-    return run_coroutine_threadsafe(coro, loop).result()
-
-def first(iterable, default=None):
-    try:
-        return next(iter(iterable))
-    except StopIteration:
-        return default
+from asyncio.subprocess import (
+    DEVNULL,
+    PIPE,
+    STDOUT,
+)
 
 class process:
     def __init__(self, executable, *args, exit_ok=(0,)):

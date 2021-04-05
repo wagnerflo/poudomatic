@@ -1,7 +1,10 @@
+from abc import ABC,abstractmethod
 from re import compile as regex
+from tempfile import mkdtemp
 from urllib.parse import urlparse
+from ..common import to_thread
 
-class Target:
+class Target(ABC):
     _registry = []
 
     @classmethod
@@ -17,11 +20,25 @@ class Target:
         super().__init_subclass__(**kwargs)
         cls._registry.append((regex(scheme), cls))
 
-class FileTarget(Target, scheme=r"^file$"):
     @classmethod
     async def new(cls, uri):
         self = cls()
+        self.uri = uri
         return self
+
+    @abstractmethod
+    async def cleanup(self):
+        pass
+
+class FileTarget(Target, scheme=r"^file$"):
+    @classmethod
+    async def new(cls, uri):
+        self = await super().new(uri)
+        # self = cls()
+        return self
+
+    async def cleanup(self):
+        pass
 
 class Build:
     def __init__(self, env, jail_version, ports_branch, target_uri):
@@ -37,8 +54,9 @@ class Build:
         env = self.env
         jail = await env.get_jail(self.jail_version)
         ports = await env.get_ports(self.ports_branch)
-        tgt = await Target.fetch(self.target_uri)
 
+        target = await Target.fetch(self.target_uri)
+        targets = { target.uri: target }
         # repo = Repository.clone_from_url(args.repository, config_context)
         # repos = { repo.url: repo }
 
