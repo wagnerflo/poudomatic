@@ -1,7 +1,8 @@
 from asyncio import get_running_loop
 from contextlib import asynccontextmanager
 from functools import partial,wraps
-from os import mkdir
+from itertools import chain
+from os import mkdir,walk
 from os.path import abspath
 from pathlib import Path
 from shutil import copytree,rmtree
@@ -28,6 +29,14 @@ mkdir = to_thread(mkdir)
 mkdtemp = to_thread(mkdtemp)
 rmtree = to_thread(rmtree)
 
+@to_thread
+def max_mtime(path):
+    mtime = path.lstat().st_mtime
+    for root,dirs,files in walk(path):
+        for p in chain(dirs, files):
+            mtime = max(Path(root, p).lstat().st_mtime, mtime)
+    return mtime
+
 @asynccontextmanager
 async def temp_copy(src, dir=None, ignore_errors=False):
     if not (src := Path(src)).is_dir():
@@ -43,6 +52,7 @@ __all__ = (
     "to_thread",
     "abspath",
     "copytree",
+    "max_mtime",
     "mkdir",
     "mkdtemp",
     "rmtree",

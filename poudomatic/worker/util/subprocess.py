@@ -9,11 +9,13 @@ from asyncio.subprocess import (
     PIPE,
     STDOUT,
 )
+from signal import SIGINT
 
 class process:
-    def __init__(self, executable, *args, exit_ok=(0,)):
+    def __init__(self, executable, *args, exit_ok=(0,), stop_signal=SIGINT):
         self.args = (executable,) + args
         self.exit_ok = exit_ok
+        self.stop_signal = stop_signal
         self.stdin = []
         self.pipe_to = []
         self.proc = None
@@ -49,18 +51,27 @@ class process:
 
     async def _write_stdin(self, stream):
         if self.stdin:
-            stream.writelines(self.stdin_lines)
-            await stream.drain()
-            stream.close()
-            await stream.wait_closed()
+            try:
+                stream.writelines(self.stdin_lines)
+                await stream.drain()
+            except CancelledError:
+                pass
+            finally:
+                stream.close()
+                await stream.wait_closed()
 
     async def _redirector(self):
-        await wait_aws((
-            create_task(self._write_stdin(self.proc.stdin)),
-            create_task(self._redirect_to(self.proc.stdout)),
-            create_task(self._redirect_to(self.proc.stderr)),
-        ))
-        await self._check_exit('')
+        try:
+            await wait_aws((
+                create_task(self._write_stdin(self.proc.stdin)),
+                create_task(self._redirect_to(self.proc.stdout)),
+                create_task(self._redirect_to(self.proc.stderr)),
+            ))
+            await self._check_exit('')
+        except CancelledError:
+            self.proc.send_signal(self.stop_signal)
+            await self.proc.wait()
+            del self.proc
 
     async def _waiter(self):
         stdout,stderr = await self.proc.communicate(

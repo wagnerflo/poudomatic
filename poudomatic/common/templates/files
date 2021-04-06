@@ -1,0 +1,9 @@
+## -*- mode: makefile -*-
+
+% extends "base"
+
+% block header
+{{ super() }}
+
+NO_BUILD=	yes
+% endblock

@@ -1,0 +1,68 @@
+## -*- mode: makefile -*-
+
+% block header
+PORTNAME=	{{ portname }}
+CATEGORIES=	{{ category }}
+PORTVERSION=	{% block portversion %}{% endblock %}
+PORTREVSION=	{% block portrevision %}0{% endblock %}
+
+MAINTAINER=	{% block maintainer %}poudomatic{% endblock %}
+% endblock
+
+% block depends
+% endblock
+
+% block options
+% endblock
+
+.include <bsd.port.options.mk>
+
+% block fetch
+DISTFILES=
+
+extract:
+do-fetch:
+	@test -d ${WRKSRC} || \
+	     cp -r /usr/ports/POUDOMATIC/{{ fetchdir|shquote }} ${WRKSRC}
+% endblock
+
+% block post_patch
+post-patch:
+% block post_patch_substitute
+% for type,src,dest,patterns in metadata.install if patterns
+%   set args
+%     for pattern,replacement in patterns
+-e 's@{{ pattern|replace("@", "\@") }}@{{ replacement|replace("@", "\@") }}@g' {# -#}
+%     endfor
+%   endset
+	@${REINPLACE_CMD} {{ args }} ${WRKSRC}/{{ src|shquote }}
+% endfor
+% endblock
+% endblock
+
+% set INSTALL_MACROS = {
+          "script": "${INSTALL_SCRIPT}",
+          "binary": "${INSTALL_PROGRAM}",
+          "data":   "${INSTALL_DATA}",
+          "man":    "${INSTALL_MAN}",
+      }
+
+% macro into_stagedir(path)
+${STAGEDIR}
+{%- if path[0] == "/" -%}
+  {{ path|shquote }}
+{%- else -%}
+  ${PREFIX}/{{ path|shquote }}
+{%- endif -%}
+% endmacro
+
+do-install:
+% for type,src,dest,substitute in metadata.install
+% if type == "symlink"
+	${RLN} {{ into_stagedir(src) }} {{ into_stagedir(dest) }}
+% else
+	{{ INSTALL_MACROS[type] }} ${WRKSRC}/{{ src|shquote }} {{ into_stagedir(dest) }}
+% endif
+% endfor
+
+.include <bsd.port.mk>

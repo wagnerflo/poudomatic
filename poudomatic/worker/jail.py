@@ -1,10 +1,6 @@
-from contextlib import asynccontextmanager
 from dataclasses import dataclass,field,InitVar
 from re import compile as regex, VERBOSE
-from shlex import quote as shquote
-
-from ..common import tempnames
-from .util import zfs,process
+from .util import zfs
 
 VERSION_RE = regex(
     r"""
@@ -55,51 +51,13 @@ class JailVersion:
             f"{0 if self.level is None else self.level}"
         )
 
-class JailExec:
-    def __init__(self, jailname):
-        self.cmd = ("/usr/sbin/jexec", "-U", "root", shquote(jailname))
-
-    def __call__(self, *args):
-        return process(*self.cmd + args)
-
 class Jail:
     FSPROPS = zfs.COMPRESSION + zfs.NOATIME
 
-    def __init__(self, env, dataset):
+    def __init__(self, env, dset):
         self.env = env
-        self.dset = dataset
-
-    @asynccontextmanager
-    async def start(self, portsname):
-        _,_,jailname = self.dset.name.rpartition("/")
-        mastername = next(tempnames)
-        await (
-            await (
-                self.env.poudriere.api() << (
-                    f"export SET_STATUS_ON_START=0",
-                    f"export MUTABLE_BASE=yes",
-                    f"export MASTERNAME={shquote(mastername)}",
-                    f"_mastermnt MASTERMNT",
-                    f"export MASTERMNT",
-                    f"jail_start {shquote(jailname)} {shquote(portsname)}",
-                )
-                >> self.env.runtime.log
-            )
-        )
-        try:
-            yield JailExec(mastername)
-        finally:
-            await (
-                await (
-                    self.env.poudriere.api() << (
-                        f"export MASTERNAME={shquote(mastername)}",
-                        f"_mastermnt MASTERMNT",
-                        f"export MASTERMNT",
-                        f"jail_stop",
-                    )
-                    >> self.env.runtime.log
-                )
-            )
+        self.dset = dset
+        _,_,self.name = dset.name.rpartition("/")
 
     @classmethod
     async def get(cls, env, version):

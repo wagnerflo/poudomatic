@@ -91,6 +91,9 @@ def main():
     )
     build.set_defaults(func=run_build)
 
-    return asyncio.run(run(root.parse_args()))
+    try:
+        return asyncio.run(run(root.parse_args()))
+    except KeyboardInterrupt:
+        pass
 
 exit(main() or 0)

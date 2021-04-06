@@ -1,0 +1,13 @@
+## -*- mode: makefile -*-
+
+% extends "files"
+% portversion "0.1"
+
+## % run_depends "shells/bash"
+## % run_depends "devel/somelib" from "https://..."
+
+% substitute { "%%PREFIX%%" with "${PREFIX}",
+               "@@PYTHON_CMD@@" with "${PYTHON_CMD}" }
+%   install script "script.py.in" as "libexec/somescript"
+%   install symlink to "libexec/somescript" as "bin/somescript"
+% endsubstitute

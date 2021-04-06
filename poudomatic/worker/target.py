@@ -4,7 +4,12 @@ from pathlib import Path
 from re import compile as regex
 from urllib.parse import urlparse,urlunparse
 
-from ..common import abspath,temp_copy
+from ..common import (
+    abspath,
+    temp_copy,
+    to_thread,
+    max_mtime,
+)
 
 class Target(ABC):
     _registry = []
@@ -26,6 +31,7 @@ class Target(ABC):
     async def new(cls, uri):
         self = cls()
         self.uri = uri
+        self.key = urlunparse(self.uri)
         self.exit_stack = AsyncExitStack()
         return self
 
@@ -35,9 +41,9 @@ class Target(ABC):
     async def cleanup(self):
         await self.exit_stack.aclose()
 
-    @property
-    def key(self):
-        return urlunparse(self.uri)
+    @to_thread
+    def templates(self):
+        return list((self.path / "poudomatic").glob("*.tmpl"))
 
 class FileTarget(Target, scheme=r"^file$"):
     @classmethod
@@ -47,8 +53,6 @@ class FileTarget(Target, scheme=r"^file$"):
         self.path = await self.with_context(
             temp_copy(self.src, dir=tempdir, ignore_errors=True)
         )
+        self.key = self.src.as_uri()
+        self.timestamp = await max_mtime(self.src)
         return self
-
-    @property
-    def key(self):
-        return self.src.as_uri()
