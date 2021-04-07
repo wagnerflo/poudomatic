@@ -1,14 +1,19 @@
+import shlex
+
+from contextlib import asynccontextmanager
 from pathlib import Path
 from pkg_resources import resource_string
-from shlex import quote as shquote
 from shutil import rmtree
 from string import Template
 
-from ..common import to_thread
+from ..common import unblocked
 from .util import zfs,process
 from .jail import Jail
-from .ports import Ports
+from .portstree import PortsTree
 from .build import Build
+
+def shquote(*args):
+    return ' '.join(shlex.quote(str(arg)) for arg in args)
 
 class Poudriere:
     def __init__(self, etc_path):
@@ -25,13 +30,17 @@ class Poudriere:
         return self("api")
 
     async def _prop_get(self, func, name, prop):
-        return await (await (self.api() << f"{func} {name} {prop}"))
+        return await (
+            await (
+                self.api() << f"{func} {shquote(name, prop)}"
+            )
+        )
 
     async def _prop_set(self, func, name, **props):
         await (
             await (
                 self.api() << (
-                    f"{func} {shquote(name)} {shquote(prop)} {shquote(value)}"
+                    f"{func} {shquote(name, prop, value)}"
                     for prop,value in props.items()
                 )
             )
@@ -49,16 +58,17 @@ class Poudriere:
     async def pset(self, name, **props):
         await self._prop_set("pset", name, **props)
 
-    @to_thread
+    @unblocked
     def rename_jail_conf(self, name, newname):
         (self.path_jails_d / name).rename(self.path_jails_d / newname)
 
-    async def remember_ports(self, name, mnt, timestamp):
+    @asynccontextmanager
+    async def activate_ports(self, name, mnt, timestamp):
         await self.pset(name, mnt=mnt, method="null", timestamp=timestamp)
-
-    @to_thread
-    def forget_ports(self, name):
-        rmtree(self.path_ports_d / name)
+        try:
+            yield
+        finally:
+            await unblocked(rmtree, self.path_ports_d / name)
 
     def write_conf(self, dset):
         tmpl = Template(
@@ -119,7 +129,7 @@ class Environment:
 
         return self
 
-    @to_thread
+    @unblocked
     def setup(self):
         if list(self.dset.children):
             raise Exception(
@@ -149,7 +159,7 @@ class Environment:
             "poudriere:type": "data",
         })
 
-    @to_thread
+    @unblocked
     def upgrade(self, old_version):
         if old_version == self.VERSION:
             return
@@ -163,13 +173,18 @@ class Environment:
         return await Jail.create(self, version)
 
     async def create_ports(self, branch):
-        return await Ports.create(self, branch)
+        return await PortsTree.create(self, branch)
 
     async def get_jail(self, version):
         return await Jail.get(self, version)
 
     async def get_ports(self, branch):
-        return await Ports.get(self, branch)
+        return await PortsTree.get(self, branch)
+
+    @asynccontextmanager
+    async def activate_ports(self, branch, *rest):
+        async with (await self.get_ports(branch)).activate() as portstree:
+            yield portstree
 
     async def build(self, jail_version, ports_branch, target):
         await Build(self, jail_version, ports_branch, target)

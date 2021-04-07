@@ -1,10 +1,14 @@
 from contextlib import asynccontextmanager
 from dataclasses import dataclass,field,InitVar
-from git import Repo
+from pathlib import Path
 from re import compile as regex
+from tempfile import mkdtemp
 
-from ..common import head
+from ..common import head,ainit,unblocked
 from .util import zfs,git
+
+PROP_TIMESTAMP = "poudomatic:timestamp"
+PROP_GITSHA    = "poudomatic:gitsha"
 
 BRANCH_RE = regex(r"^(2\d{3})Q([1-4])(?:@(\d+))?$")
 
@@ -35,10 +39,25 @@ class BranchVersion:
         else:
             return self.shortname
 
-class Ports:
-    PROP_TIMESTAMP = "poudomatic:timestamp"
-    PROP_GITSHA    = "poudomatic:gitsha"
+class ActivePortsTree:
+    @ainit
+    async def new(self, env, ver, snap):
+        self.env = env
+        self.ver = ver
+        self.name = ver.shortname
+        self.dset = await ainit.push_del(zfs.temp_clone(snap))
 
+        self.path = Path(self.dset.mountpoint)
+        self.workdir = Path(await unblocked(mkdtemp, dir=self.path))
+
+        await ainit.push_del(
+            env.poudriere.activate_ports(
+                self.name, self.path,
+                zfs.get_property(self.dset, PROP_TIMESTAMP)
+            )
+        )
+
+class PortsTree:
     FSPROPS = zfs.COMPRESSION + zfs.NOATIME
     GIT_URL = "https://git-dev.freebsd.org/ports.git"
 
@@ -48,20 +67,8 @@ class Ports:
         self.snap = snap
         self.ver = BranchVersion(ver)
 
-    @asynccontextmanager
-    async def install(self):
-        async with zfs.temp_clone(self.snap) as dset:
-            name = self.ver.shortname
-            await self.env.poudriere.remember_ports(
-                name,
-                dset.mountpoint,
-                zfs.get_property(dset, self.PROP_TIMESTAMP),
-
-            )
-            try:
-                yield dset,name
-            finally:
-                await self.env.poudriere.forget_ports(name)
+    def activate(self):
+        return ActivePortsTree.new(self.env, self.ver, self.snap)
 
     @classmethod
     async def get(cls, env, branch):
@@ -96,17 +103,15 @@ class Ports:
         # fresh installation
         async with zfs.temp_dataset(env.dset_ports, cls.FSPROPS) as dset:
             prefix,_,name = dset.name.rpartition("/")
-            repo = await git.clone_from(
-                cls.GIT_URL, dset.mountpoint,
-                depth=1, single_branch=True, branch=branch,
-            )
-            head = repo.head.commit
 
-            await zfs.set_properties(dset, {
-                cls.PROP_GITSHA:    head.hexsha,
-                cls.PROP_TIMESTAMP: head.committed_date,
-            })
-            repo.close()
+            async with git.clone_from(
+                    cls.GIT_URL, dset.mountpoint,
+                    depth=1, single_branch=True, branch=branch) as repo:
+                head = repo.head.commit
+                await zfs.set_properties(dset, {
+                    PROP_GITSHA:    head.hexsha,
+                    PROP_TIMESTAMP: head.committed_date,
+                })
 
             name = f"{prefix}/{ver.shortname}"
             snap = await zfs.create_snapshot(dset, "0")

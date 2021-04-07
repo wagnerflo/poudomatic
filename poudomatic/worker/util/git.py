@@ -1,4 +1,11 @@
+from contextlib import contextmanager
 from git import Repo
-from ...common import to_thread
+from ...common import unblockedcontextmanager
 
-clone_from = to_thread(Repo.clone_from)
+@unblockedcontextmanager
+def clone_from(*args, **kwds):
+    repo = Repo.clone_from(*args, **kwds)
+    try:
+        yield repo
+    finally:
+        repo.close()

@@ -10,6 +10,9 @@ MAINTAINER=	{% block maintainer %}poudomatic{% endblock %}
 % endblock
 
 % block depends
+% for dep in metadata.run_depends
+RUN_DEPENDS+=	{{ dep.DEPENDS }}
+% endfor
 % endblock
 
 % block options
@@ -23,7 +26,7 @@ DISTFILES=
 extract:
 do-fetch:
 	@test -d ${WRKSRC} || \
-	     cp -r /usr/ports/POUDOMATIC/{{ fetchdir|shquote }} ${WRKSRC}
+	     cp -r /usr/ports/{{ fetchdir|shquote }} ${WRKSRC}
 % endblock
 
 % block post_patch
@@ -58,6 +61,7 @@ ${STAGEDIR}
 
 do-install:
 % for type,src,dest,substitute in metadata.install
+	${MKDIR} {{ into_stagedir(dest|dirname) }}
 % if type == "symlink"
 	${RLN} {{ into_stagedir(src) }} {{ into_stagedir(dest) }}
 % else

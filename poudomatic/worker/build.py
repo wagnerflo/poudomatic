@@ -1,99 +1,79 @@
+from collections import deque
 from pathlib import Path
-from types import SimpleNamespace
-from ..common import mkdir,to_thread
-from .target import Target
+from tempfile import mkdtemp
+from ..common import cleanup,unblocked
 
-class Port:
-    def __init__(self, category, name, template, target):
-        self.category = category
-        self.name = name
-        self.template = template
-        self.target = target
-
-    @property
-    def fullname(self):
-        return f"{self.category}/{self.name}"
-
-    @to_thread
-    def generate(self, env, base, fetchdir):
-        portsdir = base / self.category / self.name
-        portsdir.mkdir()
-
-        metadata = SimpleNamespace(
-            install = [],
-            plist = [],
-        )
-        context = dict(
-            portname = self.name,
-            category = self.category,
-            fetchdir = fetchdir.name,
-            metadata = metadata,
-        )
-        tmpl = env.runtime.get_template(self.template)
-
-        with (portsdir / 'Makefile').open('w') as fp:
-            tmpl.stream(context).dump(fp)
-
-        with (portsdir / 'pkg-plist').open('w') as fp:
-            for item in metadata.plist:
-                fp.write(f"{item}\n")
-
-        with (portsdir / 'pkg-descr').open('w') as fp:
-            pass
-
-        with (portsdir / 'distinfo').open('w') as fp:
-            fp.write(f"TIMESTAMP = {int(self.target.timestamp)}\n")
+from .collection import Collection
+from .port import Port
 
 class Build:
-    def __init__(self, env, jail_version, ports_branch, target_uri):
+    def __init__(self, env, jail_version, ports_branch, collection_uri):
         self.env = env
         self.jail_version = jail_version
         self.ports_branch = ports_branch
-        self.target_uri = target_uri
+        self.collection_uri = collection_uri
 
     def __await__(self):
         return self.run().__await__()
 
+    @cleanup
     async def run(self):
         env = self.env
         jail = await env.get_jail(self.jail_version)
-        ports = await env.get_ports(self.ports_branch)
+        portstree = await cleanup.push(env.activate_ports(self.ports_branch))
 
-        targets = {}
-        allports = {}
+        collections = {}
+        generated = set()
         to_build = set()
+        to_resolve = deque()
 
-        async with ports.install() as (portsfs, portsname):
-            portsdir = Path(portsfs.mountpoint)
-            workdir = portsdir / "POUDOMATIC"
-            await mkdir(workdir)
+        async def fetch_collection(uri):
+            return Collection.new(
+                uri,
+                Path(await unblocked(mkdtemp, dir=portstree.workdir))
+            )
 
-            try:
-                target = await Target.fetch(self.target_uri, workdir)
-                targets[target.key] = target
+        col = await cleanup.push(await fetch_collection(self.collection_uri))
+        collections[col.uri] = col
 
-                for template in await target.templates():
-                    category,_,portname = template.stem.partition('_')
-                    port = Port(category, portname, template, target)
+        # initial seed of ports
+        async for port in col:
+            to_build.add(port)
+            to_resolve.append(port)
 
-                    if port.fullname in allports:
-                        continue
+        # resolve dependencies
+        while to_resolve:
+            if (port := to_resolve.pop()).origin in generated:
+                continue
 
-                    allports[port.fullname] = port
-                    to_build.add(port)
+            # generate the port
+            await port.generate(env, portstree.path, col.path)
+            generated.add(port.origin)
 
-                    await port.generate(env, portsdir, target.path)
+            # walk all dependencies
+            for dep in port.poudomatic_dependencies:
 
-                await (
-                    await (
-                        env.poudriere(
-                            "bulk", "-j", jail.name, "-p", portsname,
-                            *(port.fullname for port in to_build)
-                        )
-                        >> env.runtime.log
+                # not managed by poudomatic or already known?
+                if dep.is_external or dep.origin in generated:
+                    continue
+
+                # get the specified collection if necessary
+                if dep.uri not in collections:
+                    col = collections[dep.uri] = await cleanup.push(
+                        await fetch_collection(dep.uri)
                     )
+
+                to_resolve.append(
+                    await col.get_port(dep.category, dep.portname)
                 )
 
-            finally:
-                for target in targets.values():
-                    await target.cleanup()
+        if to_build:
+            await (
+                await (
+                    env.poudriere(
+                        "bulk", "-j", jail.name, "-p", portstree.name,
+                        *(port.origin for port in to_build)
+                    )
+                    >> env.runtime.log
+                )
+            )

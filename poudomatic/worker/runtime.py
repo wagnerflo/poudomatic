@@ -2,7 +2,7 @@ from abc import ABC,abstractmethod
 from asyncio import get_running_loop
 from jinja2 import Environment,PackageLoader
 
-from ..common import to_thread
+from ..common import unblocked
 from .jinja2 import *
 
 class BaseRuntime(ABC):
@@ -14,8 +14,9 @@ class BaseRuntime(ABC):
             loader = loader,
             extensions = (
                 BlockShortcuts,
+                DependsExtension,
+                FiltersExtension,
                 InstallExtension,
-                ShellEscapeExtension,
             ),
             autoescape = False,
             line_statement_prefix = '%',
