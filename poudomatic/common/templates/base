@@ -20,13 +20,11 @@ PKG_NOTE_poudomatic_gitsha=	{{ collection.gitsha|makevar }}
 % endif
 
 % block depends
-% for dep in metadata.run_depends
+%   for dep in metadata.run_depends
 RUN_DEPENDS+=	{{ dep.DEPENDS|makevar }}
-% endfor
+%   endfor
 % endblock
 
-% block git_hack
-% if collection.is_git
 {#
  # If, for example, a commit count (per collection.rev) is used as the
  # ports PORTVERSION and a commit is force-replaced that commit count
@@ -35,14 +33,15 @@ RUN_DEPENDS+=	{{ dep.DEPENDS|makevar }}
  # the head commit hash. This will change even if the PORTVERSION hasn't
  # and be picked up by poudrieres change detection, thus triggering a
  #}
-%- set option_value|makevar
+% block git_hack
+%   if collection.is_git
+%-    set option_value|makevar
 POUDOMATIC_GITSHA_{{ collection.gitsha|upper }}
-%- endset
+%-    endset
 OPTIONS_SINGLE=				POUDOMATIC_GITSHA
 OPTIONS_SINGLE_POUDOMATIC_GITSHA=	{{ option_value }}
 OPTIONS_DEFAULT+=			{{ option_value }}
-
-% endif
+%   endif
 % endblock
 
 % block options
@@ -61,16 +60,16 @@ do-fetch:
 
 % block post_patch
 post-patch:
-% block post_patch_substitute
-% for type,src,dest,patterns in metadata.install if patterns
-%   set args
-%     for pattern,replacement in patterns
+%   block post_patch_substitute
+%     for type,src,dest,patterns in metadata.install if patterns
+%       set args
+%         for pattern,replacement in patterns
 -e 's@{{ pattern|replace("@", "\@") }}@{{ replacement|replace("@", "\@") }}@g' {# -#}
-%     endfor
-%   endset
+%         endfor
+%       endset
 	@${REINPLACE_CMD} {{ args }} ${WRKSRC}/{{ src|shquote }}
-% endfor
-% endblock
+%     endfor
+%   endblock
 % endblock
 
 % set INSTALL_MACROS = {
@@ -92,11 +91,11 @@ ${STAGEDIR}
 do-install:
 % for type,src,dest,substitute in metadata.install
 	${MKDIR} {{ into_stagedir(dest|dirname) }}
-% if type == "symlink"
+%   if type == "symlink"
 	${RLN} {{ into_stagedir(src) }} {{ into_stagedir(dest) }}
-% else
+%   else
 	{{ INSTALL_MACROS[type] }} ${WRKSRC}/{{ src|shquote }} {{ into_stagedir(dest) }}
-% endif
+%   endif
 % endfor
 
 .include <bsd.port.mk>
