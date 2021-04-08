@@ -7,6 +7,7 @@ from shutil import copytree
 from urllib.parse import urlparse,urlunparse
 
 from ..common import asyncinit,unblocked
+from .util import git
 from .port import Port
 
 class Collection(ABC):
@@ -74,3 +75,28 @@ class LocalCollection(Collection, scheme=r"^file$", shortname="local"):
     @property
     def revision(self):
         return self._stamp
+
+class GitCollection(Collection, scheme=r"^git\+", shortname="git"):
+    @asyncinit
+    async def new(self, uri):
+        self._uri = urlunparse(uri)
+        self._repo = await asyncinit.push_del(
+            git.clone_from(
+                urlunparse(uri._replace(scheme=uri.scheme[4:])),
+                self.path, single_branch=True,
+            )
+        )
+        self._rev_list_count = await git.count_head(self._repo)
+        self._head_sha = await git.sha_head(self._repo)
+
+    @property
+    def uri(self):
+        return self._uri
+
+    @property
+    def revision(self):
+        return self._rev_list_count
+
+    @property
+    def gitsha(self):
+        return self._head_sha

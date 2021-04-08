@@ -15,6 +15,26 @@ RUN_DEPENDS+=	{{ dep.DEPENDS|makevar }}
 % endfor
 % endblock
 
+% block git_hack
+% if collection.is_git
+{#
+ # If, for example, a commit count (per collection.rev) is used as the
+ # ports PORTVERSION and a commit is force-replaced that commit count
+ # will not change, even though the package resulting from the build
+ # might. This is a little hack will add an enabled port option with
+ # the head commit hash. This will change even if the PORTVERSION hasn't
+ # and be picked up by poudrieres change detection, thus triggering a
+ #}
+%- set option_value|makevar
+POUDOMATIC_GITSHA_{{ collection.gitsha|upper }}
+%- endset
+OPTIONS_SINGLE=				POUDOMATIC_GITSHA
+OPTIONS_SINGLE_POUDOMATIC_GITSHA=	{{ option_value }}
+OPTIONS_DEFAULT+=			{{ option_value }}
+
+% endif
+% endblock
+
 % block options
 % endblock
 
