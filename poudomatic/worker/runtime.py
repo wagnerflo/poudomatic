@@ -15,6 +15,7 @@ class BaseRuntime(ABC):
             extensions = (
                 BlockShortcuts,
                 DependsExtension,
+                DescriptionExtension,
                 FiltersExtension,
                 InstallExtension,
             ),

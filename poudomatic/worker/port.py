@@ -17,6 +17,8 @@ class Port:
         portsdir.mkdir()
 
         metadata = SimpleNamespace(
+            description = None,
+            comment = None,
             install = [],
             plist = [],
             build_depends = [],
@@ -43,7 +45,10 @@ class Port:
                 fp.write(f"{item}\n")
 
         with (portsdir / 'pkg-descr').open('w') as fp:
-            pass
+            descr = metadata.description or metadata.comment
+            if descr:
+                fp.write(f"{descr.rstrip()}\n\n")
+            fp.write(f"WWW: {self.collection.uri}\n")
 
         with (portsdir / 'distinfo').open('w') as fp:
             fp.write(f"TIMESTAMP = {int(time())}\n")

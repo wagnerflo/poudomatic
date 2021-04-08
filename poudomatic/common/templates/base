@@ -7,7 +7,17 @@ PORTVERSION=	{% filter makevar %}{% block portversion %}{% endblock %}{% endfilt
 PORTREVSION=	{% filter makevar %}{% block portrevision %}0{% endblock %}{% endfilter %}
 
 MAINTAINER=	{% filter makevar %}{% block maintainer %}poudomatic{% endblock %}{% endfilter %}
+COMMENT=	{% filter makevar %}{% block comment %}{% endblock %}{% endfilter %}
+LICENSE=	{% filter makevar %}{% block license %}APACHE20{% endblock %}{% endfilter %}
 % endblock
+
+PKG_NOTES+=			poudomatic_collection
+PKG_NOTE_poudomatic_collection=	{{ collection.uri|makevar }}
+
+% if collection.is_git
+PKG_NOTES+=			poudomatic_gitsha
+PKG_NOTE_poudomatic_gitsha=	{{ collection.gitsha|makevar }}
+% endif
 
 % block depends
 % for dep in metadata.run_depends

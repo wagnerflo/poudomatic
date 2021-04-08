@@ -32,13 +32,17 @@ class Collection(ABC):
 
     @unblocked
     def __aiter__(self):
-        for template in (self.path / "poudomatic").glob("*.tmpl"):
-            category,_,portname = template.stem.partition("_")
-            yield Port(category, portname, template, self)
+        for category in (self.path / "poudomatic").iterdir():
+            if not category.is_dir():
+                continue
+            for template in category.iterdir():
+                if not template.is_file():
+                    continue
+                yield Port(category.name, template.name, template, self)
 
     @unblocked
     def get_port(self, category, portname):
-        template = self.path / "poudomatic" / f"{category}_{portname}.tmpl"
+        template = self.path / "poudomatic" / category / portname
         if not template.is_file():
             raise Exception()
         return Port(category, portname, template, self)
