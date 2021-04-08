@@ -1,4 +1,6 @@
 from abc import ABC,abstractmethod
+from itertools import chain
+from os import walk
 from pathlib import Path
 from re import compile as regex
 from shutil import copytree
@@ -43,13 +45,30 @@ class Collection(ABC):
     def uri(self):
         pass
 
+    @property
+    @abstractmethod
+    def revision(self):
+        pass
+
+def mtime_walk(path):
+    yield path.lstat().st_mtime
+    for root,dirs,files in walk(path):
+        for p in chain(dirs, files):
+            yield Path(root, p).lstat().st_mtime
+
 class LocalCollection(Collection, scheme=r"^file$"):
     @asyncinit
     @unblocked
     def new(self, uri):
-        self.src = Path(uri.path).resolve()
-        copytree(self.src, self.path, dirs_exist_ok=True)
+        self._src = Path(uri.path).resolve()
+        copytree(self._src, self.path, dirs_exist_ok=True)
+        self._uri = self._src.as_uri()
+        self._stamp = int(max(mtime_walk(self._src)))
 
     @property
     def uri(self):
-        return self.src.as_uri()
+        return self._uri
+
+    @property
+    def revision(self):
+        return self._stamp
