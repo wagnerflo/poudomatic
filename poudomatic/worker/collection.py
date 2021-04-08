@@ -4,7 +4,7 @@ from re import compile as regex
 from shutil import copytree
 from urllib.parse import urlparse,urlunparse
 
-from ..common import ainit,unblocked
+from ..common import asyncinit,unblocked
 from .port import Port
 
 class Collection(ABC):
@@ -16,11 +16,14 @@ class Collection(ABC):
         cls._registry.append((regex(scheme), cls))
 
     @classmethod
-    def new(cls, uri, targetdir):
+    def new(cls, uri, path):
         uri = urlparse(uri)
         for re,cls in cls._registry:
             if re.match(uri.scheme):
-                return cls.new(uri, targetdir)
+                return cls.new(path, uri)
+
+    def __init__(self, path):
+        self.path = path
 
     @unblocked
     def __aiter__(self):
@@ -35,11 +38,18 @@ class Collection(ABC):
             raise Exception()
         return Port(category, portname, template, self)
 
+    @property
+    @abstractmethod
+    def uri(self):
+        pass
+
 class LocalCollection(Collection, scheme=r"^file$"):
-    @ainit
+    @asyncinit
     @unblocked
-    def new(self, uri, targetdir):
-        print("LocalCollection.new")
+    def new(self, uri):
         self.src = Path(uri.path).resolve()
-        self.path = copytree(self.src, targetdir, dirs_exist_ok=True)
-        self.uri = self.src.as_uri()
+        copytree(self.src, self.path, dirs_exist_ok=True)
+
+    @property
+    def uri(self):
+        return self.src.as_uri()

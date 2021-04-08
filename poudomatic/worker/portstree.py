@@ -4,7 +4,7 @@ from pathlib import Path
 from re import compile as regex
 from tempfile import mkdtemp
 
-from ..common import head,ainit,unblocked
+from ..common import head,asyncinit,unblocked
 from .util import zfs,git
 
 PROP_TIMESTAMP = "poudomatic:timestamp"
@@ -40,17 +40,17 @@ class BranchVersion:
             return self.shortname
 
 class ActivePortsTree:
-    @ainit
+    @asyncinit
     async def new(self, env, ver, snap):
         self.env = env
         self.ver = ver
         self.name = ver.shortname
-        self.dset = await ainit.push_del(zfs.temp_clone(snap))
+        self.dset = await asyncinit.push_del(zfs.temp_clone(snap))
 
         self.path = Path(self.dset.mountpoint)
         self.workdir = Path(await unblocked(mkdtemp, dir=self.path))
 
-        await ainit.push_del(
+        await asyncinit.push_del(
             env.poudriere.activate_ports(
                 self.name, self.path,
                 zfs.get_property(self.dset, PROP_TIMESTAMP)
