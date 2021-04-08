@@ -13,9 +13,11 @@ class Collection(ABC):
     _registry = []
 
     @classmethod
-    def __init_subclass__(cls, /, scheme, **kwds):
+    def __init_subclass__(cls, /, scheme, shortname, **kwds):
         super().__init_subclass__(**kwds)
         cls._registry.append((regex(scheme), cls))
+        for _,other in cls._registry:
+            setattr(other, f"is_{shortname}", other == cls)
 
     @classmethod
     def new(cls, uri, path):
@@ -56,7 +58,7 @@ def mtime_walk(path):
         for p in chain(dirs, files):
             yield Path(root, p).lstat().st_mtime
 
-class LocalCollection(Collection, scheme=r"^file$"):
+class LocalCollection(Collection, scheme=r"^file$", shortname="local"):
     @asyncinit
     @unblocked
     def new(self, uri):
