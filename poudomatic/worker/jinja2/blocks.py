@@ -1,5 +1,5 @@
+from jinja2 import nodes
 from jinja2.ext import Extension
-from jinja2.nodes import Block,Output,CallBlock
 
 from .base import (
     DispatchParseMixin,
@@ -17,16 +17,18 @@ class BlockShortcuts(Extension):
     def parse(self, parser):
         token = next(parser.stream)
         lineno = token.lineno
-        node = Block(lineno=lineno)
+        node = nodes.Block(lineno=lineno)
         node.name = token.value
-        node.body = [Output([parser.parse_expression()], lineno=lineno)]
+        node.body = [
+            nodes.Output([parser.parse_expression()], lineno=lineno)
+        ]
         return node
 
 class DescriptionExtension(DispatchParseMixin,Extension):
     tags = frozenset(["comment", "description"])
 
     def parse_description(self, parser, stream, token, lineno):
-        return CallBlock(
+        return nodes.CallBlock(
             self.call_method(
                 "_description", [load_from_context("metadata")],
                 lineno=lineno
@@ -39,10 +41,10 @@ class DescriptionExtension(DispatchParseMixin,Extension):
         )
 
     def parse_comment(self, parser, stream, token, lineno):
-        node = Block(lineno=lineno)
+        node = nodes.Block(lineno=lineno)
         node.name = token.value
         node.body = [
-            CallBlock(
+            nodes.CallBlock(
                 self.call_method(
                     "_comment", [
                         load_from_context("metadata"),
