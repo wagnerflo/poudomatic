@@ -1,17 +1,17 @@
 ## -*- mode: makefile -*-
 
 % block header
-PORTNAME=	{{ portname }}
-CATEGORIES=	{{ category }}
-PORTVERSION=	{% block portversion %}{% endblock %}
-PORTREVSION=	{% block portrevision %}0{% endblock %}
+PORTNAME=	{{ portname|makevar }}
+CATEGORIES=	{{ category|makevar }}
+PORTVERSION=	{% filter makevar %}{% block portversion %}{% endblock %}{% endfilter %}
+PORTREVSION=	{% filter makevar %}{% block portrevision %}0{% endblock %}{% endfilter %}
 
-MAINTAINER=	{% block maintainer %}poudomatic{% endblock %}
+MAINTAINER=	{% filter makevar %}{% block maintainer %}poudomatic{% endblock %}{% endfilter %}
 % endblock
 
 % block depends
 % for dep in metadata.run_depends
-RUN_DEPENDS+=	{{ dep.DEPENDS }}
+RUN_DEPENDS+=	{{ dep.DEPENDS|makevar }}
 % endfor
 % endblock
 
