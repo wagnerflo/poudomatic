@@ -1,5 +1,5 @@
+from itertools import chain
 from time import time
-from types import SimpleNamespace
 from ..common import unblocked
 
 class Port:
@@ -16,25 +16,14 @@ class Port:
         portsdir = base / self.category / self.portname
         portsdir.mkdir()
 
-        metadata = SimpleNamespace(
-            description = None,
-            comment = None,
-            install = [],
-            plist = [],
-            build_depends = [],
-            run_depends = [],
-        )
-        context = dict(
+        metadata = env.runtime.render_port(
+            self.template, portsdir / 'Makefile',
             portname = self.portname,
             category = self.category,
             fetchdir = fetchdir.relative_to(base),
             collection = self.collection,
-            metadata = metadata,
         )
-        tmpl = env.runtime.get_template(self.template)
 
-        with (portsdir / 'Makefile').open('w') as fp:
-            tmpl.stream(context).dump(fp)
 
         # with (portsdir / 'Makefile').open() as fp:
         #     for line in fp.readlines():
@@ -53,7 +42,6 @@ class Port:
         with (portsdir / 'distinfo').open('w') as fp:
             fp.write(f"TIMESTAMP = {int(time())}\n")
 
-        self.poudomatic_dependencies = (
-            metadata.build_depends +
-            metadata.run_depends
+        self.poudomatic_dependencies = list(
+            chain.from_iterable(metadata.depends.values())
         )

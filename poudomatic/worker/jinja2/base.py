@@ -6,15 +6,31 @@ def load_from_context(head, *postfix):
         head = nodes.Getattr(head, part, "load")
     return head
 
-def parse_strings(parser):
+def parse_token_as_const(parser):
+    token = next(parser.stream)
+    return nodes.Const(token.value, lineno=token.lineno)
+
+def parse_name_as_const(parser):
+    token = parser.stream.expect("name")
+    return nodes.Const(token.value, lineno=token.lineno)
+
+def parse_keyword_pair(parser):
+    key = parse_name_as_const(parser)
+    parser.stream.expect("assign")
+    return nodes.Pair(key, parser.parse_expression(), lineno=key.lineno)
+
+def parse_keywords(parser):
+    items = []
     stream = parser.stream
-    token = stream.expect("string")
-    buf = [token.value]
-    lineno = token.lineno
-    while stream.current.type == "string":
-        buf.append(stream.current.value)
-        next(stream)
-    return nodes.Const("".join(buf), lineno=lineno)
+    lineno = stream.expect("lbrace").lineno
+    while stream.current.type != "rbrace":
+        if items:
+            stream.expect("comma")
+        if stream.current.type == "rbrace":
+            break
+        items.append(parse_keyword_pair(parser))
+    next(stream)
+    return nodes.Dict(items, lineno=lineno)
 
 class DispatchParseMixin:
     def dispatch(self, funcname, *args, **kwds):

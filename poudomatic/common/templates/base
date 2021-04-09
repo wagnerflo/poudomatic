@@ -20,7 +20,7 @@ PKG_NOTE_poudomatic_gitsha=	{{ collection.gitsha|makevar }}
 % endif
 
 % block depends
-%   for dep in metadata.run_depends
+%   for dep in rendervars.depends.run_depends
 RUN_DEPENDS+=	{{ dep.DEPENDS|makevar }}
 %   endfor
 % endblock
@@ -61,7 +61,7 @@ do-fetch:
 % block post_patch
 post-patch:
 %   block post_patch_substitute
-%     for type,src,dest,patterns in metadata.install if patterns
+%     for type,src,dest,patterns in rendervars.install if patterns
 %       set args
 %         for pattern,replacement in patterns
 -e 's@{{ pattern|replace("@", "\@") }}@{{ replacement|replace("@", "\@") }}@g' {# -#}
@@ -89,7 +89,7 @@ ${STAGEDIR}
 % endmacro
 
 do-install:
-% for type,src,dest,substitute in metadata.install
+% for type,src,dest,substitute in rendervars.install
 	${MKDIR} {{ into_stagedir(dest|dirname) }}
 %   if type == "symlink"
 	${RLN} {{ into_stagedir(src) }} {{ into_stagedir(dest) }}

@@ -1,6 +1,7 @@
 from abc import ABC,abstractmethod
 from asyncio import get_running_loop
 from jinja2 import Environment,PackageLoader
+from jinja2_rendervars import RenderVarsExtension
 
 from ..common import unblocked
 from .jinja2 import *
@@ -18,6 +19,7 @@ class BaseRuntime(ABC):
                 DescriptionExtension,
                 FiltersExtension,
                 InstallExtension,
+                RenderVarsExtension,
             ),
             autoescape = False,
             line_statement_prefix = '%',
@@ -26,8 +28,17 @@ class BaseRuntime(ABC):
         )
         return self
 
-    def get_template(self, path):
-        return self.jinja2.from_string(path.read_text())
+    def render_port(self, template, target, **context):
+        tmpl = self.jinja2.from_string(template.read_text())
+        with target.open('w') as fp:
+            with self.jinja2.rendervars() as vars:
+                tmpl.stream(context).dump(fp)
+                return vars
+
+    def render_template(self, name, target, **context):
+        tmpl = self.jinja2.get_template(name)
+        with target.open('w') as fp:
+            tmpl.stream(context).dump(fp)
 
     @abstractmethod
     async def log(self, msg):

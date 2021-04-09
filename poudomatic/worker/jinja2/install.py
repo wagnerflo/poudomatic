@@ -1,9 +1,10 @@
 from jinja2 import nodes
 from jinja2.ext import Extension
+from jinja2_rendervars import RenderVar
 
 from .base import (
     DispatchParseMixin,
-    load_from_context,
+    parse_name_as_const,
 )
 
 class InstallExtension(DispatchParseMixin,Extension):
@@ -12,16 +13,18 @@ class InstallExtension(DispatchParseMixin,Extension):
         "substitute",
     ])
 
+    install = RenderVar("install", list)
+    plist = RenderVar("plist", list)
+
     def parse_install(self, parser, stream, token, lineno):
-        tpe = stream.expect("name").value
+        tpe = parse_name_as_const(parser)
         return nodes.CallBlock(
             self.call_method(
                 "_install", [
-                    load_from_context("metadata", "install"),
-                    load_from_context("metadata", "plist"),
-                    nodes.Const(tpe),
+                    tpe,
                     *self.dispatch(
-                        f"parse_install_{tpe}", parser, stream, lineno
+                        f"parse_install_{tpe.value}",
+                        parser, stream, lineno
                     )
                 ], lineno=lineno
             ),
@@ -76,9 +79,9 @@ class InstallExtension(DispatchParseMixin,Extension):
             lineno=lineno
         )
 
-    def _install(self, install, plist, tpe, src, dst, patterns, caller):
-        install.append((tpe, src, dst, patterns or []))
-        plist.append(dst)
+    def _install(self, tpe, src, dst, patterns, caller):
+        self.install.append((tpe, src, dst, patterns or []))
+        self.plist.append(dst)
         return ""
 
 __all__ = (

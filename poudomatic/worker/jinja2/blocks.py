@@ -1,10 +1,8 @@
 from jinja2 import nodes
 from jinja2.ext import Extension
+from jinja2_rendervars import RenderVar
 
-from .base import (
-    DispatchParseMixin,
-    load_from_context,
-)
+from .base import DispatchParseMixin
 
 class BlockShortcuts(Extension):
     tags = frozenset([
@@ -26,13 +24,12 @@ class BlockShortcuts(Extension):
 
 class DescriptionExtension(DispatchParseMixin,Extension):
     tags = frozenset(["comment", "description"])
+    comment = RenderVar("comment", None)
+    description = RenderVar("description", None)
 
     def parse_description(self, parser, stream, token, lineno):
         return nodes.CallBlock(
-            self.call_method(
-                "_description", [load_from_context("metadata")],
-                lineno=lineno
-            ),
+            self.call_method("_description", [], lineno=lineno),
             [], [],
             parser.parse_statements(
                 ("name:enddescription",), drop_needle=True
@@ -40,32 +37,32 @@ class DescriptionExtension(DispatchParseMixin,Extension):
             lineno=lineno
         )
 
+    def _description(self, caller):
+        if self.description is not None:
+            raise Exception()
+        self.description = caller()
+        return ""
+
     def parse_comment(self, parser, stream, token, lineno):
         node = nodes.Block(lineno=lineno)
         node.name = token.value
         node.body = [
             nodes.CallBlock(
                 self.call_method(
-                    "_comment", [
-                        load_from_context("metadata"),
-                        parser.parse_expression(),
-                    ], lineno=lineno
+                    "_comment",
+                    [ parser.parse_expression() ],
+                    lineno=lineno
                 ),
                 [], [], [], lineno=lineno
             )
         ]
         return node
 
-    def _description(self, metadata, caller):
-        if metadata.description is not None:
-            raise Exception()
-        metadata.description = caller()
-        return ""
 
-    def _comment(self, metadata, value, caller):
-        if metadata.comment is not None:
+    def _comment(self, value, caller):
+        if self.comment is not None:
             raise Exception()
-        metadata.comment = value
+        self.comment = value
         return value
 
 __all__ = (
