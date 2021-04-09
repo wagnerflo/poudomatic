@@ -2,9 +2,7 @@ import shlex
 
 from contextlib import asynccontextmanager
 from pathlib import Path
-from pkg_resources import resource_string
 from shutil import rmtree
-from string import Template
 
 from ..common import unblocked
 from .util import zfs,process
@@ -70,17 +68,13 @@ class Poudriere:
         finally:
             await unblocked(rmtree, self.path_ports_d / name)
 
-    def write_conf(self, dset):
-        tmpl = Template(
-            resource_string(__name__, "poudriere.conf").decode()
-        )
+    def write_conf(self, env, dset):
         zpool,sep,zrootfs = dset.name.partition("/")
-        self.path_conf.write_text(
-            tmpl.substitute(
-                ZPOOL   = zpool,
-                ZROOTFS = f"{sep}{zrootfs}",
-                BASEFS  = dset.mountpoint,
-            )
+        env.runtime.render_template(
+            "poudriere.conf", self.path_conf,
+            ZPOOL   = zpool,
+            ZROOTFS = f"{sep}{zrootfs}",
+            BASEFS  = dset.mountpoint,
         )
 
 class Environment:
@@ -151,7 +145,7 @@ class Environment:
             zfs.create_dataset(f"{self.dset.name}/{name}", props)
 
         # write configuration file for poudriere
-        self.poudriere.write_conf(self.dset)
+        self.poudriere.write_conf(self, self.dset)
 
         # set properties
         zfs.set_properties(self.dset, {
@@ -161,11 +155,7 @@ class Environment:
 
     @unblocked
     def upgrade(self, old_version):
-        if old_version == self.VERSION:
-            return
-
-        self.poudriere.write_conf(self.dset)
-
+        self.poudriere.write_conf(self, self.dset)
         for ver in range(old_version + 1, self.VERSION + 1):
             getattr(self, f"upgrade_to_{ver}")()
 
