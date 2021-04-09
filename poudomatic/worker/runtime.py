@@ -14,6 +14,7 @@ class BaseRuntime(ABC):
         self.jinja2 = Environment(
             loader = loader,
             extensions = (
+                AccountsExtension,
                 BlockShortcuts,
                 DependsExtension,
                 DescriptionExtension,

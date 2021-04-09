@@ -47,6 +47,35 @@ OPTIONS_DEFAULT+=			{{ option_value }}
 % block options
 % endblock
 
+% block users
+%   if rendervars.groups
+%     script pre_install
+%       block install_groups_sh
+%         include "install_groups.sh"
+%       endblock
+%     endscript
+%   endif
+%   if rendervars.users
+%     script pre_install
+%       block install_users_sh
+%         include "install_users.sh"
+%       endblock
+%     endscript
+%     script post_deinstall
+%       block deinstall_users_sh
+%         include "deinstall_users.sh"
+%       endblock
+%     endscript
+%   endif
+%   if rendervars.groups
+%     script post_deinstall
+%       block deinstall_groups_sh
+%         include "deinstall_groups.sh"
+%       endblock
+%     endscript
+%   endif
+% endblock
+
 .include <bsd.port.options.mk>
 
 % block fetch
