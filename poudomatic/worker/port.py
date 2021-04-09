@@ -24,11 +24,6 @@ class Port:
             collection = self.collection,
         )
 
-
-        # with (portsdir / 'Makefile').open() as fp:
-        #     for line in fp.readlines():
-        #         print(line, end='')
-
         with (portsdir / 'pkg-plist').open('w') as fp:
             for item in metadata.plist:
                 fp.write(f"{item}\n")

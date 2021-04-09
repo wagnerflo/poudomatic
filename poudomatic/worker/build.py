@@ -67,13 +67,16 @@ class Build:
                     await col.get_port(dep.category, dep.portname)
                 )
 
-        if to_build:
+        # we might have found no ports in the collection
+        if not to_build:
+            return
+
+        await (
             await (
-                await (
-                    env.poudriere(
-                        "bulk", "-j", jail.name, "-p", portstree.name,
-                        *(port.origin for port in to_build)
-                    )
-                    >> env.runtime.log
+                env.poudriere(
+                    "bulk", "-j", jail.name, "-p", portstree.name,
+                    *(port.origin for port in to_build)
                 )
+                >> env.runtime.log
             )
+        )
