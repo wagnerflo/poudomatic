@@ -20,6 +20,7 @@ class BaseRuntime(ABC):
                 FiltersExtension,
                 InstallExtension,
                 RenderVarsExtension,
+                ScriptExtension,
             ),
             autoescape = False,
             line_statement_prefix = '%',

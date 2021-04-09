@@ -37,6 +37,15 @@ class Port:
         with (portsdir / 'distinfo').open('w') as fp:
             fp.write(f"TIMESTAMP = {int(time())}\n")
 
+        for script,targets in metadata.scripts.items():
+            if not any(targets.values()):
+                continue
+
+            env.runtime.render_template(
+                "pkg_script.sh", portsdir / script,
+                targets=targets,
+            )
+
         self.poudomatic_dependencies = list(
             chain.from_iterable(metadata.depends.values())
         )
