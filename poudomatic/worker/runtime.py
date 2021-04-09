@@ -1,6 +1,6 @@
 from abc import ABC,abstractmethod
 from asyncio import get_running_loop
-from jinja2 import Environment,PackageLoader
+from jinja2 import Environment,PackageLoader,StrictUndefined
 from jinja2_rendervars import RenderVarsExtension
 
 from ..common import unblocked
@@ -26,6 +26,7 @@ class BaseRuntime(ABC):
             line_statement_prefix = '%',
             line_comment_prefix = '##',
             keep_trailing_newline = True,
+            undefined = StrictUndefined,
         )
         return self
 

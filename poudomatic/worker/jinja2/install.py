@@ -35,7 +35,11 @@ class InstallExtension(DispatchParseMixin,Extension):
         yield parser.parse_expression()
         stream.expect("name:as")
         yield parser.parse_expression()
-        yield nodes.Name("_patterns", "load", lineno=lineno)
+        yield nodes.Filter(
+            nodes.Name("_patterns", "load", lineno=lineno),
+            "default", [nodes.Const(None, lineno=lineno)], [], None, None,
+            lineno=lineno
+        )
 
     def parse_install_data(self, parser, stream, lineno):
         return self.parse_install_script(parser, stream, lineno)
