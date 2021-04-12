@@ -59,3 +59,8 @@ async def follow(fp):
             0, 0
         )
         del futures[fd]
+
+__all__ = (
+    "follow",
+    "TruncationError",
+)
