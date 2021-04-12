@@ -176,5 +176,8 @@ class Environment:
         async with (await self.get_ports(branch)).activate() as portstree:
             yield portstree
 
-    async def build(self, jail_version, ports_branch, target):
-        await Build(self, jail_version, ports_branch, target)
+    async def build(self, jail_version, ports_branch, target, inspect_only=False):
+        await Build(
+            self, jail_version, ports_branch, target,
+            inspect_only=inspect_only,
+        )

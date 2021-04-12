@@ -1,17 +1,20 @@
+from asyncio import create_subprocess_exec
 from collections import deque
 from pathlib import Path
 from tempfile import mkdtemp
-from ..common import cleanup,unblocked
 
+from ..common import cleanup,unblocked
 from .collection import Collection
 from .port import Port
 
 class Build:
-    def __init__(self, env, jail_version, ports_branch, collection_uri):
+    def __init__(self, env, jail_version, ports_branch, collection_uri,
+                 inspect_only=False):
         self.env = env
         self.jail_version = jail_version
         self.ports_branch = ports_branch
         self.collection_uri = collection_uri
+        self.inspect_only = inspect_only
 
     def __await__(self):
         return self.run().__await__()
@@ -23,7 +26,7 @@ class Build:
         portstree = await cleanup.push(env.activate_ports(self.ports_branch))
 
         collections = {}
-        generated = set()
+        generated = {}
         to_build = set()
         to_resolve = deque()
 
@@ -48,7 +51,7 @@ class Build:
 
             # generate the port
             await port.generate(env, portstree.path, col.path)
-            generated.add(port.origin)
+            generated[port.origin] = port
 
             # walk all dependencies
             for dep in port.poudomatic_dependencies:
@@ -67,16 +70,26 @@ class Build:
                     await col.get_port(dep.category, dep.portname)
                 )
 
-        # we might have found no ports in the collection
-        if not to_build:
-            return
-
-        await (
+        # user only wants to inspect generated files
+        if self.inspect_only:
             await (
-                env.poudriere(
-                    "bulk", "-j", jail.name, "-p", portstree.name,
-                    *(port.origin for port in to_build)
+                await create_subprocess_exec(
+                    "/usr/bin/less", "-R",
+                    *( path.relative_to(portstree.path)
+                       for path in port.generated_files
+                       for port in generated.values() ),
+                    cwd = portstree.path,
                 )
-                >> env.runtime.log
+            ).wait()
+
+        # only run poudriere bulk if we found ports in the collection
+        elif to_build:
+            await (
+                await (
+                    env.poudriere(
+                        "bulk", "-j", jail.name, "-p", portstree.name,
+                        *(port.origin for port in to_build)
+                    )
+                    >> env.runtime.log
+                )
             )
-        )

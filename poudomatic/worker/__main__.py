@@ -13,7 +13,10 @@ async def create_ports(env, args):
     await env.create_ports(args.branch)
 
 async def run_build(env, args):
-    await env.build(args.jail, args.ports, args.target)
+    await env.build(
+        args.jail, args.ports, args.target,
+        inspect_only=args.inspect,
+    )
 
 async def run(args):
     rt = await ConsoleRuntime.new()
@@ -71,6 +74,12 @@ def main():
     build = root_sub.add_parser(
         "build", help="Run one-shot builds."
     )
+    build.add_argument(
+        "-i", "--inspect", action="store_true", help=(
+            "Don't actuall run a build, only inspect generated files."
+        )
+    )
+
     build.add_argument(
         "jail", help=(
 
