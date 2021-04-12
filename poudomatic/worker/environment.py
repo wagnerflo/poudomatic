@@ -4,14 +4,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from shutil import rmtree
 
-from ..common import unblocked
+from ..common import unblocked,shquote
 from .util import zfs,process
 from .jail import Jail
 from .portstree import PortsTree
 from .build import Build
-
-def shquote(*args):
-    return ' '.join(shlex.quote(str(arg)) for arg in args)
 
 class Poudriere:
     def __init__(self, etc_path):
