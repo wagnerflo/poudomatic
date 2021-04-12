@@ -23,7 +23,7 @@ class Port:
         portsdir = base / self.category / self.portname
         portsdir.mkdir()
 
-        with self.mark_generated(portsdir / 'Makefile') as target:
+        with self.mark_generated(portsdir / "Makefile") as target:
             metadata = env.runtime.render_port(
                 self.template, target,
                 portname = self.portname,
@@ -32,20 +32,20 @@ class Port:
                 collection = self.collection,
             )
 
-        with self.mark_generated(portsdir / 'pkg-plist') as target:
-            with target.open('w') as fp:
+        with self.mark_generated(portsdir / "pkg-plist") as target:
+            with target.open("w") as fp:
                 for item in metadata.plist:
                     fp.write(f"{item}\n")
 
-        with self.mark_generated(portsdir / 'pkg-descr') as target:
-            with target.open('w') as fp:
+        with self.mark_generated(portsdir / "pkg-descr") as target:
+            with target.open("w") as fp:
                 descr = metadata.description or metadata.comment
                 if descr:
                     fp.write(f"{descr.rstrip()}\n\n")
                 fp.write(f"WWW: {self.collection.uri}\n")
 
-        with self.mark_generated(portsdir / 'distinfo') as target:
-            with target.open('w') as fp:
+        with self.mark_generated(portsdir / "distinfo") as target:
+            with target.open("w") as fp:
                 fp.write(f"TIMESTAMP = {int(time())}\n")
 
         for script,targets in metadata.scripts.items():

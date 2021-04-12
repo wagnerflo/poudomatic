@@ -13,7 +13,7 @@ from .base import (
 class Dependency:
     def __init__(self, origin, version, uri):
         self.origin = origin
-        self.version = [(s, str(v)) for s,v in version] or [('>', '0')]
+        self.version = [(s, str(v)) for s,v in version] or [(">", "0")]
         self.uri = uri
         self.is_external = uri is None
         self.category,_,self.portname = self.origin.partition("/")

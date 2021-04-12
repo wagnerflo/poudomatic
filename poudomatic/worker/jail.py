@@ -33,13 +33,13 @@ class JailVersion:
 
     def __post_init__(self, version):
         if (match := VERSION_RE.match(version)) is not None:
-            object.__setattr__(self, "release", match.group('release'))
-            if match.group('pre'):
-                object.__setattr__(self, "type",  match.group('pre'))
-                object.__setattr__(self, "level", match.group('level'))
+            object.__setattr__(self, "release", match.group("release"))
+            if match.group("pre"):
+                object.__setattr__(self, "type",  match.group("pre"))
+                object.__setattr__(self, "level", match.group("level"))
             else:
-                object.__setattr__(self, "type",  match.group('rel'))
-                object.__setattr__(self, "level", match.group('patch'))
+                object.__setattr__(self, "type",  match.group("rel"))
+                object.__setattr__(self, "level", match.group("patch"))
         else:
             raise Exception()
 
