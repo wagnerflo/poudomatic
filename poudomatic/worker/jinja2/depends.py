@@ -11,12 +11,14 @@ from .base import (
 )
 
 class Dependency:
-    def __init__(self, origin, version, uri):
+    def __init__(self, origin, modifier, version, uri, portname=None):
         self.origin = origin
+        self.modifier = modifier
         self.version = [(s, str(v)) for s,v in version] or [(">", "0")]
         self.uri = uri
         self.is_external = uri is None
-        self.category,_,self.portname = self.origin.partition("/")
+        self.category,_,pn = self.origin.partition("/")
+        self.portname = portname if portname else pn
         self.DEPENDS = (
             f"{self.portname}"
             f"{''.join(s+v for s,v in self.version)}:"
@@ -37,7 +39,16 @@ class DependsExtension(Extension):
         stream = parser.stream
         lineno = stream.current.lineno
 
+        modifier = nodes.Const(None, lineno=lineno)
+        portname = nodes.Const(None, lineno=lineno)
+
         tpe = parse_name_as_const(parser)
+
+        for opt in ("python",):
+            if stream.current.test(f"name:{opt}"):
+                modifier = nodes.Const(opt, lineno=next(stream).lineno)
+                break
+
         origin = parser.parse_expression()
         version = nodes.List([], lineno=origin.lineno)
 
@@ -56,6 +67,11 @@ class DependsExtension(Extension):
                 if stream.current.test("comma"):
                     next(stream)
 
+        # portname override
+        if stream.current.test("name:portname"):
+            next(stream)
+            portname = parser.parse_expression()
+
         # reference to port definied in same collection,
         if stream.current.test("name:local"):
             next(stream)
@@ -72,22 +88,22 @@ class DependsExtension(Extension):
 
         else:
             raise TemplateSyntaxError(
-                f"unexpected token {describe_token(token)!r}",
-                token.lineno, stream.name, stream.filename,
+                f"unexpected token {describe_token(stream.current)!r}",
+                stream.current.lineno, stream.name, stream.filename,
             )
 
         return nodes.CallBlock(
             self.call_method(
                 "_depends",
-                [ tpe, origin, version, collection ],
+                [ tpe, modifier, origin, version, portname, collection ],
                 lineno=lineno
             ),
             [], [], [], lineno=lineno
         )
 
-    def _depends(self, tpe, origin, version, collection, caller):
+    def _depends(self, tpe, modifier, origin, version, portname, collection, caller):
         self.depends[tpe].append(
-            Dependency(origin, version, collection)
+            Dependency(origin, modifier, version, collection, portname=portname)
         )
         return ""
 

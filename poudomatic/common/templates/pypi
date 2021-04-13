@@ -8,13 +8,23 @@ MASTER_SITES=	CHEESESHOP
 % endblock
 
 % block fetch
-% if False
-CHECKSUM_GPG_DIR!=	mktemp -d ${WRKSRC}/gpg.XXXXXX
+NO_CHECKSUM=		yes
+% if rendervars.verify.how == "gpg"
+FETCH_DEPENDS=		gpg2:security/gnupg
+CHECKSUM_GPG_HOME=	${WRKDIR}/.gpg
+EXTRACT_ONLY=		${DISTNAME}${EXTRACT_SUFX}
+DISTFILES=		${EXTRACT_ONLY} ${EXTRACT_ONLY}.asc
 
 checksum: fetch
-	gpg --homedir ${TEMPDIR:Q} --recv {{ rendervars.verify_fingerprint }}
-	...
-% else
-NO_CHECKSUM=	yes
+	@mkdir -m 0700 -p ${CHECKSUM_GPG_HOME}; \
+         if [ ! -e "${CHECKSUM_GPG_HOME}/pubring.kbx" ]; then \
+	     gpg --homedir ${CHECKSUM_GPG_HOME} \
+	         --recv {{ rendervars.verify.fingerprint }}; \
+	     for file in ${DISTFILES:M*.asc:S/.asc$//g}; do \
+	         gpg --homedir ${CHECKSUM_GPG_HOME} \
+	             --verify  --trust-model always \
+	             ${_DISTDIR}/$${file}.asc ${_DISTDIR}/$${file}; \
+	     done; \
+	 fi
 % endif
 % endblock

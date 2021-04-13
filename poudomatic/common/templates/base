@@ -11,6 +11,11 @@ COMMENT=	{% filter makevar %}{% block comment %}{% endblock %}{% endfilter %}
 LICENSE=	{% filter makevar %}{% block license %}APACHE20{% endblock %}{% endfilter %}
 % endblock
 
+% block options
+% endblock
+
+.include <bsd.port.options.mk>
+
 PKG_NOTES+=			poudomatic_collection
 PKG_NOTE_poudomatic_collection=	{{ collection.uri|makevar }}
 
@@ -19,9 +24,17 @@ PKG_NOTES+=			poudomatic_gitsha
 PKG_NOTE_poudomatic_gitsha=	{{ collection.gitsha|makevar }}
 % endif
 
+%- macro with_modifier(dep, modifier)
+%-   if modifier == "python"
+${PYTHON_PKGNAMEPREFIX}{{ dep }}@${PY_FLAVOR}
+%-   else
+{{ dep }}
+%-   endif
+%- endmacro
+
 % block depends
 %   for dep in rendervars.depends.run_depends
-RUN_DEPENDS+=	{{ dep.DEPENDS|makevar }}
+RUN_DEPENDS+=	{{ with_modifier(dep.DEPENDS, dep.modifier)|makevar }}
 %   endfor
 % endblock
 
@@ -53,8 +66,6 @@ RUN_DEPENDS+=	{{ dep.DEPENDS|makevar }}
 %     endscript
 %   endif
 % endblock
-
-.include <bsd.port.options.mk>
 
 % block fetch
 DISTFILES=

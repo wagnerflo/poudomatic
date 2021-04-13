@@ -59,7 +59,7 @@ class ActivePortsTree:
 
 class PortsTree:
     FSPROPS = zfs.COMPRESSION + zfs.NOATIME
-    GIT_URL = "https://git-dev.freebsd.org/ports.git"
+    GIT_URL = "https://git.freebsd.org/ports.git"
 
     def __init__(self, env, snap):
         _,_,ver = snap.name.rpartition("/")

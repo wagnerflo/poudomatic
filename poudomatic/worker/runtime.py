@@ -22,6 +22,7 @@ class BaseRuntime(ABC):
                 InstallExtension,
                 RenderVarsExtension,
                 ScriptExtension,
+                VerifyExtension,
             ),
             autoescape = False,
             line_statement_prefix = '%',
