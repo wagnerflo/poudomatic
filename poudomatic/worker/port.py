@@ -42,7 +42,7 @@ class Port:
                 descr = metadata.description or metadata.comment
                 if descr:
                     fp.write(f"{descr.rstrip()}\n\n")
-                fp.write(f"WWW: {self.collection.uri}\n")
+                fp.write(f"WWW: {metadata.www or self.collection.uri}\n")
 
         with self.mark_generated(portsdir / "distinfo") as target:
             with target.open("w") as fp:

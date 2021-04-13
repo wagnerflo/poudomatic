@@ -23,9 +23,14 @@ class BlockShortcuts(Extension):
         return node
 
 class DescriptionExtension(DispatchParseMixin,Extension):
-    tags = frozenset(["comment", "description"])
+    tags = frozenset([
+        "comment",
+        "description",
+        "www",
+    ])
     comment = RenderVar("comment", None)
     description = RenderVar("description", None)
+    www = RenderVar("www", None)
 
     def parse_description(self, parser, stream, token, lineno):
         return nodes.CallBlock(
@@ -64,6 +69,20 @@ class DescriptionExtension(DispatchParseMixin,Extension):
             raise Exception()
         self.comment = value
         return value
+
+    def parse_www(self, parser, stream, token, lineno):
+        return nodes.CallBlock(
+            self.call_method(
+                "_www", [ parser.parse_expression() ], lineno=lineno
+            ),
+            [], [], [], lineno=lineno
+        )
+
+    def _www(self, value, caller):
+        if self.www is not None:
+            raise Exception()
+        self.www = value
+        return ""
 
 __all__ = (
     "BlockShortcuts",
