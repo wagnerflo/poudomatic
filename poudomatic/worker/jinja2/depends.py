@@ -45,8 +45,6 @@ class DependsExtension(Extension):
         if stream.current.test("name:version"):
             next(stream)
             for i in range(2):
-                if i:
-                    stream.expect("comma")
                 if stream.current.type not in ("assign", "eq", "gt", "gteq", "lt", "lteq"):
                     break
                 version.items.append(
@@ -55,8 +53,8 @@ class DependsExtension(Extension):
                         parser.parse_expression(),
                     ], "store", lineno=lineno)
                 )
-            if stream.current.test("comma"):
-                next(stream)
+                if stream.current.test("comma"):
+                    next(stream)
 
         # reference to port definied in same collection,
         if stream.current.test("name:local"):
