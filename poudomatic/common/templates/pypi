@@ -1,0 +1,20 @@
+## -*- mode: makefile -*-
+
+% extends "python"
+
+% block header
+{{ super() }}
+MASTER_SITES=	CHEESESHOP
+% endblock
+
+% block fetch
+% if False
+CHECKSUM_GPG_DIR!=	mktemp -d ${WRKSRC}/gpg.XXXXXX
+
+checksum: fetch
+	gpg --homedir ${TEMPDIR:Q} --recv {{ rendervars.verify_fingerprint }}
+	...
+% else
+NO_CHECKSUM=	yes
+% endif
+% endblock

@@ -1,0 +1,18 @@
+## -*- mode: makefile -*-
+
+% extends "base"
+
+% block header
+{{ super() }}
+PKGNAMEPREFIX=	${PYTHON_PKGNAMEPREFIX}
+USES=		python:{% block pyversion %}3.8+{% endblock %}
+USE_PYTHON=	{% block use_python %}autoplist distutils{% endblock %}
+% endblock
+
+% block post_install
+{{ super() }}
+%   block python_strip_extensions
+	@${FIND} ${STAGEDIR}${PYTHONPREFIX_SITELIBDIR} \
+	    -type f -name "*.so" -exec ${STRIP_CMD} {} +
+%   endblock
+% endblock

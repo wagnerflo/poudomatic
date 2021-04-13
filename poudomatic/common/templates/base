@@ -87,8 +87,8 @@ do-fetch:
 	     cp -r /usr/ports/{{ fetchdir|shquote }} ${WRKSRC}
 % endblock
 
-% block post_patch
 post-patch:
+% block post_patch
 %   block post_patch_substitute
 %     for type,src,dest,patterns in rendervars.install if patterns
 %       set args
@@ -99,6 +99,18 @@ post-patch:
 	@${REINPLACE_CMD} {{ args }} ${WRKSRC}/{{ src|shquote }}
 %     endfor
 %   endblock
+% endblock
+
+post-install:
+% block post_install
+% for type,src,dest,substitute in rendervars.install
+	${MKDIR} {{ into_stagedir(dest|dirname) }}
+%   if type == "symlink"
+	${RLN} {{ into_stagedir(src) }} {{ into_stagedir(dest) }}
+%   else
+	{{ INSTALL_MACROS[type] }} ${WRKSRC}/{{ src|shquote }} {{ into_stagedir(dest) }}
+%   endif
+% endfor
 % endblock
 
 % set INSTALL_MACROS = {
@@ -116,15 +128,5 @@ ${STAGEDIR}
   ${PREFIX}/{{ path|shquote }}
 {%- endif -%}
 % endmacro
-
-do-install:
-% for type,src,dest,substitute in rendervars.install
-	${MKDIR} {{ into_stagedir(dest|dirname) }}
-%   if type == "symlink"
-	${RLN} {{ into_stagedir(src) }} {{ into_stagedir(dest) }}
-%   else
-	{{ INSTALL_MACROS[type] }} ${WRKSRC}/{{ src|shquote }} {{ into_stagedir(dest) }}
-%   endif
-% endfor
 
 .include <bsd.port.mk>
