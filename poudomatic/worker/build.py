@@ -76,8 +76,8 @@ class Build:
                 await create_subprocess_exec(
                     "/usr/bin/less", "-R",
                     *( path.relative_to(portstree.path)
-                       for path in port.generated_files
-                       for port in generated.values() ),
+                       for port in generated.values()
+                       for path in port.generated_files ),
                     cwd = portstree.path,
                 )
             ).wait()
