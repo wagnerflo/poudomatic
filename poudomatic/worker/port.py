@@ -34,8 +34,10 @@ class Port:
 
         with self.mark_generated(portsdir / "pkg-plist") as target:
             with target.open("w") as fp:
-                for item in metadata.plist:
-                    fp.write(f"{item}\n")
+                for item in sorted(metadata.plist, key=lambda i: i.dest, reverse=True):
+                    if item.keyword:
+                        fp.write(f"{item.keyword} ")
+                    fp.write(f"{item.dest}\n")
 
         with self.mark_generated(portsdir / "pkg-descr") as target:
             with target.open("w") as fp:

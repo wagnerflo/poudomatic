@@ -79,27 +79,18 @@ do-fetch:
 post-patch:
 % block post_patch
 %   block post_patch_substitute
-%     for type,src,dest,patterns in rendervars.install if patterns
+%     for type,src,dest,conf in rendervars.install if (
+                                    conf.patterns is defined and
+                                    conf.patterns
+                                )
 %       set args
-%         for pattern,replacement in patterns
+%         for pattern,replacement in conf.patterns
 -e 's@{{ pattern|replace("@", "\@") }}@{{ replacement|replace("@", "\@") }}@g' {# -#}
 %         endfor
 %       endset
 	@${REINPLACE_CMD} {{ args }} ${WRKSRC}/{{ src|shquote }}
 %     endfor
 %   endblock
-% endblock
-
-post-install:
-% block post_install
-% for type,src,dest,substitute in rendervars.install
-	${MKDIR} {{ into_stagedir(dest|dirname) }}
-%   if type == "symlink"
-	${RLN} {{ into_stagedir(src) }} {{ into_stagedir(dest) }}
-%   else
-	{{ INSTALL_MACROS[type] }} ${WRKSRC}/{{ src|shquote }} {{ into_stagedir(dest) }}
-%   endif
-% endfor
 % endblock
 
 % set INSTALL_MACROS = {
@@ -117,5 +108,20 @@ ${STAGEDIR}
   ${PREFIX}/{{ path|shquote }}
 {%- endif -%}
 % endmacro
+
+post-install:
+% block post_install
+% for type,src,dest,conf in rendervars.install|sort(attribute="dest")
+%   if type == "symlink"
+	${MKDIR} {{ into_stagedir(dest|dirname) }}
+	${RLN} {{ into_stagedir(src) }} {{ into_stagedir(dest) }}
+%   elif type == "mkdir"
+	${MKDIR} -m {{ conf.mode|default("755") }} {{ into_stagedir(dest) }}
+%   else
+	${MKDIR} {{ into_stagedir(dest|dirname) }}
+	{{ INSTALL_MACROS[type] }} ${WRKSRC}/{{ src|shquote }} {{ into_stagedir(dest) }}
+%   endif
+% endfor
+% endblock
 
 .include <bsd.port.mk>

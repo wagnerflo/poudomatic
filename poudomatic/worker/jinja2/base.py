@@ -32,6 +32,19 @@ def parse_keywords(parser):
     next(stream)
     return nodes.Dict(items, lineno=lineno)
 
+def make_default(expr, default):
+    return nodes.Filter(
+        expr, "default", [default], [], None, None,
+        lineno=expr.lineno
+    )
+
+def make_dict(dct, lineno):
+    return nodes.Dict(
+        [ nodes.Pair(nodes.Const(key, lineno=lineno), value, lineno=lineno)
+          for key,value in dct.items() ],
+        lineno=lineno
+    )
+
 class DispatchParseMixin:
     def dispatch(self, funcname, *args, **kwds):
         return getattr(self, funcname)(*args, **kwds)
