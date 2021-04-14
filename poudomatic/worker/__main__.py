@@ -2,7 +2,9 @@ import asyncio
 
 from argparse import ArgumentParser
 from sys import exit
+from types import SimpleNamespace
 
+from .build import BuildMode
 from .environment import Environment
 from .runtime import ConsoleRuntime
 
@@ -15,13 +17,54 @@ async def create_ports(env, args):
 async def run_build(env, args):
     await env.build(
         args.jail, args.ports, args.target,
-        inspect_only=args.inspect,
+        BuildMode.BUILD, None
+    )
+
+async def run_inspect(env, args):
+    await env.build(
+        args.jail, args.ports, args.target,
+        BuildMode.INSPECT, SimpleNamespace(origin=args.origin)
+    )
+
+async def run_testport(env, args):
+    await env.build(
+        args.jail, args.ports, args.target,
+        BuildMode.TEST, SimpleNamespace(origin=args.origin)
     )
 
 async def run(args):
     rt = await ConsoleRuntime.new()
     env = await Environment.new(args.dataset, rt)
     return await args.func(env, args)
+
+def need_jail(parser, name, metavar=None):
+    parser.add_argument(
+        name,
+        metavar=name.upper() if metavar is None else metavar,
+        help=(
+            "FreeBSD system version of the jail to work on/with."
+        ),
+    )
+
+def need_ports(parser, name, metavar=None):
+    parser.add_argument(
+        name,
+        metavar=name.upper() if metavar is None else metavar,
+        help=(
+            "Ports branch version to work on/with."
+        ),
+    )
+
+def need_target(parser, name, metavar=None):
+    parser.add_argument(
+        name,
+        metavar=name.upper() if metavar is None else metavar,
+        help=(
+            "URI of a target to build. Supported protocols are file:PATH "
+            "(plain directory) and git+[GITURL] (Git repository cloneable "
+            "from GITURL)."
+        ),
+    )
 
 def main():
     root = ArgumentParser()
@@ -45,11 +88,7 @@ def main():
     jail_create = jail_sub.add_parser(
         "create", help="Create a new jail."
     )
-    jail_create.add_argument(
-        "version", metavar="VERSION", help=(
-
-        )
-    )
+    need_jail(jail_create, "version")
     jail_create.set_defaults(func=create_jail)
 
     # PORTS handling
@@ -63,42 +102,45 @@ def main():
     ports_create = ports_sub.add_parser(
         "create", help="Create a new ports tree."
     )
-    ports_create.add_argument(
-        "branch", metavar="BRANCH", help=(
-
-        )
-    )
+    need_ports(ports_create, "branch")
     ports_create.set_defaults(func=create_ports)
 
     # BUILD handling
     build = root_sub.add_parser(
         "build", help="Run one-shot builds."
     )
-    build.add_argument(
-        "-i", "--inspect", action="store_true", help=(
-            "Don't actuall run a build, only inspect generated files."
+    need_jail(build, "jail")
+    need_ports(build, "ports")
+    need_target(build, "target")
+    build.set_defaults(func=run_build)
+
+    # INSPECT handling
+    inspect = root_sub.add_parser(
+        "inspect", help="Inspect generated ports definitions."
+    )
+    inspect.add_argument(
+        "-o", "--origin", metavar="ORIGIN", help=(
+            "Only show files generated for port ORIGIN."
         )
     )
+    need_jail(inspect, "jail")
+    need_ports(inspect, "ports")
+    need_target(inspect, "target")
+    inspect.set_defaults(func=run_inspect)
 
-    build.add_argument(
-        "jail", help=(
-
-        ),
+    # TESTPORT handling
+    testport = root_sub.add_parser(
+        "testport", help="Run a test build of a single port."
     )
-    build.add_argument(
-        "ports", help=(
-
-        ),
+    need_jail(testport, "jail")
+    need_ports(testport, "ports")
+    need_target(testport, "target")
+    testport.add_argument(
+        "origin", metavar="ORIGIN", help=(
+            "Origin of the port to test."
+        )
     )
-    build.add_argument(
-        "target",
-        help=(
-            "URI of a target to build. Supported protocols are file:PATH "
-            "(plain directory) and git+[GITURL] (Git repository cloneable "
-            "from GITURL)."
-        ),
-    )
-    build.set_defaults(func=run_build)
+    testport.set_defaults(func=run_testport)
 
     try:
         return asyncio.run(run(root.parse_args()))

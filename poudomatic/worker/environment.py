@@ -8,7 +8,7 @@ from ..common import unblocked,shquote
 from .util import zfs,process
 from .jail import Jail
 from .portstree import PortsTree
-from .build import Build
+from .build import run_build
 
 class Poudriere:
     def __init__(self, etc_path):
@@ -173,8 +173,8 @@ class Environment:
         async with (await self.get_ports(branch)).activate() as portstree:
             yield portstree
 
-    async def build(self, jail_version, ports_branch, target, inspect_only=False):
-        await Build(
+    async def build(self, jail_version, ports_branch, target, mode, mode_opts=None):
+        await run_build(
             self, jail_version, ports_branch, target,
-            inspect_only=inspect_only,
+            mode, mode_opts
         )
