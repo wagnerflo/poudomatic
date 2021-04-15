@@ -4,7 +4,7 @@
 PORTNAME=	{{ portname|makevar }}
 CATEGORIES=	{{ category|makevar }}
 PORTVERSION=	{% filter makevar %}{% block portversion %}{% endblock %}{% endfilter %}
-PORTREVSION=	{% filter makevar %}{% block portrevision %}0{% endblock %}{% endfilter %}
+PORTREVISION=	{% filter makevar %}{% block portrevision %}0{% endblock %}{% endfilter %}
 
 MAINTAINER=	{% filter makevar %}{% block maintainer %}poudomatic{% endblock %}{% endfilter %}
 COMMENT=	{% filter makevar %}{% block comment %}{% endblock %}{% endfilter %}
