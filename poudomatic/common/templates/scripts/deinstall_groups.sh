@@ -3,7 +3,7 @@ set -e
 set -u
 set -f
 
-% include "need_pw.sh"
+% include "scripts/need_pw.sh"
 
 % for group,grpconf in rendervars.groups.items()
 if ${PW} groupshow {{ group }} >/dev/null 2>&1; then

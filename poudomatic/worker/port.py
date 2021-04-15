@@ -56,7 +56,7 @@ class Port:
 
             with self.mark_generated(portsdir / script) as target:
                 env.runtime.render_template(
-                    "pkg_script.sh", target,
+                    "scripts/pkg_script.sh", target,
                     targets=targets,
                 )
 

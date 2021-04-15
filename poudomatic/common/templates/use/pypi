@@ -1,0 +1,25 @@
+## -*- mode: makefile -*-
+
+% macro fetch()
+MASTER_SITES=		CHEESESHOP
+NO_CHECKSUM=		yes
+EXTRACT_ONLY=		${DISTNAME}${EXTRACT_SUFX}
+DISTFILES=		${EXTRACT_ONLY}
+
+%   if verify
+FETCH_DEPENDS+=		gpg2:security/gnupg
+DISTFILES+=		${EXTRACT_ONLY}.asc
+CHECKSUM_GPG_HOME=	${WRKDIR}/.gpg
+
+checksum: fetch
+	@mkdir -m 0700 -p ${WRKDIR}/.gpg; \
+         if [ ! -e "${WRKDIR}/.gpg/pubring.kbx" ]; then \
+	     gpg --homedir ${WRKDIR}/.gpg \
+	         --recv {{ rendervars.verify.fingerprint }}; \
+	     for file in ${DISTFILES:M*.asc:S/.asc$//g}; do \
+	         gpg --homedir ${WRKDIR}/.gpg \
+	             --verify  --trust-model always \
+	             ${_DISTDIR}/$${file}.asc ${_DISTDIR}/$${file}; \
+	     done; \
+	 fi
+% endmacro

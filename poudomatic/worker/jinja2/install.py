@@ -80,7 +80,6 @@ class InstallExtension(DispatchParseMixin,Extension):
         yield nodes.Const(None, lineno=lineno)
 
     def parse_substitute(self, parser, stream, token, lineno):
-        node = nodes.With(lineno=lineno)
         patterns = []
 
         if stream.current.type == "lbrace":

@@ -6,4 +6,5 @@
 {{ super() }}
 
 NO_BUILD=	yes
+NO_INSTALL=	yes
 % endblock

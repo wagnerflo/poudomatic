@@ -42,38 +42,42 @@ RUN_DEPENDS+=	{{ with_modifier(dep.DEPENDS, dep.modifier)|makevar }}
 %   if rendervars.groups
 %     script pre_install
 %       block install_groups_sh
-%         include "install_groups.sh"
+%         include "scripts/install_groups.sh"
 %       endblock
 %     endscript
 %   endif
 %   if rendervars.users
 %     script pre_install
 %       block install_users_sh
-%         include "install_users.sh"
+%         include "scripts/install_users.sh"
 %       endblock
 %     endscript
 %     script post_deinstall
 %       block deinstall_users_sh
-%         include "deinstall_users.sh"
+%         include "scripts/deinstall_users.sh"
 %       endblock
 %     endscript
 %   endif
 %   if rendervars.groups
 %     script post_deinstall
 %       block deinstall_groups_sh
-%         include "deinstall_groups.sh"
+%         include "scripts/deinstall_groups.sh"
 %       endblock
 %     endscript
 %   endif
 % endblock
 
 % block fetch
+%   if fetch is defined
+{{ fetch() }}
+%   else
 DISTFILES=
 
 extract:
 do-fetch:
 	@test -d ${WRKSRC} || \
 	     cp -r /usr/ports/{{ fetchdir|shquote }} ${WRKSRC}
+%   endif
 % endblock
 
 post-patch:
