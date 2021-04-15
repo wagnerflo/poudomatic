@@ -3,10 +3,7 @@
 % import "common/gnupg" as gnupg
 
 %- macro fetch()
-%-   set ghtoken = "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"
-%-   set giturl
-https://{{ ghtoken }}:x-oauth-basic@github.com/{{ account }}/{{ project }}.git
-%-   endset
+%-   set giturl = "https://github.com/" ~ account ~ "/" ~ project ~ ".git"
 %-   set targetdir = "${WRKDIRPREFIX}/.gitclone.${PORTNAME}.${PREFIX:S/\//_/g}"
 
 DISTFILES=
