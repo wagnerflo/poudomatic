@@ -61,12 +61,7 @@ class InstallExtension(DispatchParseMixin,Extension):
         stream.expect("name:as")
         yield parser.parse_expression()
         yield nodes.Const(None, lineno=lineno)
-        yield make_dict({
-            "patterns": make_default(
-                nodes.Name("_patterns", "load", lineno=lineno),
-                nodes.Const(None, lineno=lineno)
-            )
-        }, lineno=lineno)
+        yield self.make_patterns(lineno)
 
     def parse_install_data(self, parser, stream, lineno):
         return self.parse_install_script(parser, stream, lineno)
@@ -78,6 +73,23 @@ class InstallExtension(DispatchParseMixin,Extension):
         yield parser.parse_expression()
         yield nodes.Const(None, lineno=lineno)
         yield nodes.Const(None, lineno=lineno)
+
+    def parse_install_man(self, parser, stream, lineno):
+        yield parser.parse_expression()
+        stream.expect("name:into")
+        stream.expect("name:section")
+        section = stream.expect("integer")
+        yield nodes.Const(section.value, lineno=section.lineno)
+        yield nodes.Const(None, lineno=lineno)
+        yield self.make_patterns(lineno)
+
+    def make_patterns(self, lineno):
+        return make_dict({
+            "patterns": make_default(
+                nodes.Name("_patterns", "load", lineno=lineno),
+                nodes.Const(None, lineno=lineno)
+            )
+        }, lineno=lineno)
 
     def parse_substitute(self, parser, stream, token, lineno):
         patterns = []
@@ -112,7 +124,8 @@ class InstallExtension(DispatchParseMixin,Extension):
 
     def _install(self, tpe, src, dst, keyword, conf, caller):
         self.install.append(InstallItem(tpe, src, dst, conf))
-        self.plist.append(PlistItem(dst, keyword))
+        if tpe not in ("man",):
+            self.plist.append(PlistItem(dst, keyword))
         return ""
 
 __all__ = (

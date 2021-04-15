@@ -14,6 +14,7 @@ class FiltersExtension(Extension):
         environment.filters.update(
             shquote = self._shquote,
             dirname = self._dirname,
+            basename = self._basename,
             makevar = self._makevar,
             heredoc = self._heredoc,
         )
@@ -23,6 +24,9 @@ class FiltersExtension(Extension):
 
     def _dirname(self, arg):
         return str(Path(arg).parent)
+
+    def _basename(self, arg):
+        return str(Path(arg).name)
 
     def _makevar(self, arg):
         if (arg := str(arg)):

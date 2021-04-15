@@ -72,6 +72,7 @@ RUN_DEPENDS+=	{{ with_modifier(dep.DEPENDS, dep.modifier)|makevar }}
 % block fetch
 ## we always do our own checksuming: define a checksum target and let it
 ## depend on a cookie file; also a :: target that creates the cookie
+NO_CHECKSUM=		yes
 _PHONY_TARGETS+=	checksum
 FETCH_COOKIE=		${WRKDIRPREFIX}/.fetch_done.${PORTNAME}.${PREFIX:S/\//_/g}
 CHECKSUM_COOKIE=	${WRKDIRPREFIX}/.chksum_done.${PORTNAME}.${PREFIX:S/\//_/g}
@@ -121,17 +122,15 @@ post-patch:
           "script": "${INSTALL_SCRIPT}",
           "binary": "${INSTALL_PROGRAM}",
           "data":   "${INSTALL_DATA}",
-          "man":    "${INSTALL_MAN}",
       }
 
-% macro into_stagedir(path)
+%- macro into_stagedir(path)
 ${STAGEDIR}
-{%- if path[0] == "/" -%}
-  {{ path|shquote }}
-{%- else -%}
-  ${PREFIX}/{{ path|shquote }}
-{%- endif -%}
-% endmacro
+%- if path[0] != "/"
+${PREFIX}/
+%- endif
+{{ path|shquote }}
+%- endmacro
 
 post-install:
 % block post_install
@@ -139,6 +138,12 @@ post-install:
 %   if type == "symlink"
 	${MKDIR} {{ into_stagedir(dest|dirname) }}
 	${RLN} {{ into_stagedir(src) }} {{ into_stagedir(dest) }}
+%   elif type == "man"
+%     set mpostfix = "man/man" ~ dest
+%     set mdest = "${MAN" ~ dest ~ "PREFIX}/" ~ mpostfix
+	${MKDIR} ${STAGEDIR}/{{ mdest }}
+	${INSTALL_MAN} ${WRKSRC}/{{ src|shquote }} ${STAGEDIR}/{{ mdest }}
+	${ECHO_CMD} {{ mpostfix }}/{{ src|basename }}.gz >> ${TMPPLIST}
 %   elif type == "mkdir"
 	${MKDIR} -m {{ conf.mode|default("755") }} {{ into_stagedir(dest) }}
 %   else
