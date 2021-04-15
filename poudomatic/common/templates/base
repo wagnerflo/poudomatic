@@ -67,17 +67,37 @@ RUN_DEPENDS+=	{{ with_modifier(dep.DEPENDS, dep.modifier)|makevar }}
 %   endif
 % endblock
 
+.include <bsd.port.pre.mk>
+
 % block fetch
+## we always do our own checksuming: define a checksum target and let it
+## depend on a cookie file; also a :: target that creates the cookie
+_PHONY_TARGETS+=	checksum
+FETCH_COOKIE=		${WRKDIRPREFIX}/.fetch_done.${PORTNAME}.${PREFIX:S/\//_/g}
+CHECKSUM_COOKIE=	${WRKDIRPREFIX}/.chksum_done.${PORTNAME}.${PREFIX:S/\//_/g}
+
 %   if fetch is defined
 {{ fetch() }}
 %   else
+## the default is to fetch nothing at all but just copy over
 DISTFILES=
-
-extract:
 do-fetch:
-	@test -d ${WRKSRC} || \
-	     cp -r /usr/ports/{{ fetchdir|shquote }} ${WRKSRC}
+do-extract:
+	@cp -r /usr/ports/{{ fetchdir|shquote }} ${WRKSRC}
 %   endif
+
+.if !target(checksum)
+checksum: fetch do-checksum
+.endif
+.if !target(do-checksum)
+do-checksum: ${CHECKSUM_COOKIE}
+.endif
+.for tgt in FETCH CHECKSUM
+.if !target(${${tgt}_COOKIE})
+${${tgt}_COOKIE}:
+	@${TOUCH} ${TOUCH_FLAGS} ${${tgt}_COOKIE}
+.endif
+.endfor
 % endblock
 
 post-patch:
@@ -128,4 +148,4 @@ post-install:
 % endfor
 % endblock
 
-.include <bsd.port.mk>
+.include <bsd.port.post.mk>

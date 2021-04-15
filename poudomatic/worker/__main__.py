@@ -66,6 +66,15 @@ def need_target(parser, name, metavar=None):
         ),
     )
 
+def need_origin(parser, name, metavar=None):
+    parser.add_argument(
+        name,
+        metavar=name.upper() if metavar is None else metavar,
+        help=(
+            "Origin inside the ports tree of the port to work on."
+        )
+    )
+
 def main():
     root = ArgumentParser()
     root.add_argument(
@@ -118,14 +127,10 @@ def main():
     inspect = root_sub.add_parser(
         "inspect", help="Inspect generated ports definitions."
     )
-    inspect.add_argument(
-        "-o", "--origin", metavar="ORIGIN", help=(
-            "Only show files generated for port ORIGIN."
-        )
-    )
     need_jail(inspect, "jail")
     need_ports(inspect, "ports")
     need_target(inspect, "target")
+    need_origin(inspect, "origin")
     inspect.set_defaults(func=run_inspect)
 
     # TESTPORT handling
@@ -135,11 +140,7 @@ def main():
     need_jail(testport, "jail")
     need_ports(testport, "ports")
     need_target(testport, "target")
-    testport.add_argument(
-        "origin", metavar="ORIGIN", help=(
-            "Origin of the port to test."
-        )
-    )
+    need_origin(testport, "origin")
     testport.set_defaults(func=run_testport)
 
     try:

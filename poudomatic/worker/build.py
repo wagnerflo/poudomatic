@@ -65,15 +65,15 @@ async def run_build(env, jail_version, ports_branch, collection_uri, mode, mode_
 
     # user only wants to inspect generated files
     if mode is BuildMode.INSPECT:
-        await (
-            await create_subprocess_exec(
-                "/usr/bin/less", "-R",
-                *( path.relative_to(portstree.path)
-                   for port in generated.values() if (
-                           mode_opts.origin is None or
-                           port.origin == mode_opts.origin
-                       )
-                   for path in port.generated_files ),
+        if (port := generated.get(mode_opts.origin)) is None:
+            env.runtime.log("No files generated for '{mode_opts.origin}'.")
+
+        else:
+            await (
+                await create_subprocess_exec(
+                    "/usr/bin/less", "-R",
+                    *( path.relative_to(portstree.path)
+                       for path in port.generated_files ),
                 cwd = portstree.path,
             )
         ).wait()

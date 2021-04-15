@@ -1,0 +1,11 @@
+## -*- mode: makefile -*-
+
+%- macro recv(fingerprint)
+%-   set homedir = "${WRKDIRPREFIX}/.gnupg.${PORTNAME}.${PREFIX:S/\//_/g}"
+%-   set gpg = "gpg --homedir " ~ homedir
+	@mkdir -p -m 0700 {{ homedir }}
+	@echo "trust-model always" > {{ homedir }}/gpg.conf
+	@{{ gpg }} --recv {{ fingerprint }}
+{{ caller(gpg, homedir) }}
+	@rm -rf {{ homedir }}
+% endmacro

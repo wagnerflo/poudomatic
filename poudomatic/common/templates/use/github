@@ -1,0 +1,32 @@
+## -*- mode: makefile -*-
+
+% import "common/gnupg" as gnupg
+
+%- macro fetch()
+%-   set ghtoken = "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"
+%-   set giturl
+https://{{ ghtoken }}:x-oauth-basic@github.com/{{ account }}/{{ project }}.git
+%-   endset
+%-   set targetdir = "${WRKDIRPREFIX}/.gitclone.${PORTNAME}.${PREFIX:S/\//_/g}"
+
+DISTFILES=
+FETCH_DEPENDS+=	git:devel/git
+%   if verify
+FETCH_DEPENDS+=	gpg2:security/gnupg
+%   endif
+
+do-fetch: ${FETCH_COOKIE}
+${FETCH_COOKIE}:
+	@mkdir -p {{ targetdir }}
+	@git clone {{ giturl }} {{ targetdir }}
+	@git -C {{ targetdir }} -c advice.detachedHead=false checkout {{ tagname }}
+%   if verify
+%     call(gpg, gpghome) gnupg.recv(verify)
+	@GNUPGHOME={{ gpghome }} git -C {{ targetdir }} verify-commit {{ tagname }}
+%     endcall
+%   endif
+	@${TOUCH} ${TOUCH_FLAGS} ${FETCH_COOKIE}
+
+do-extract:
+	git -C {{ targetdir }} checkout-index -a --prefix=${WRKSRC}/
+% endmacro
