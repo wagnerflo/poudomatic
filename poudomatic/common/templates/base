@@ -156,21 +156,37 @@ ${PREFIX}/
 
 post-install:
 % block post_install
-% for type,src,dest,conf in rendervars.install|sort(attribute="dest")
+## first make directories
+%   set ns = namespace()
+%   set created = []
+%   for type,src,dest,conf in rendervars.install|sort(attribute="dest")
+%     if type == "mkdir"
+%       set ns.target = into_stagedir(dest)
+%       set ns.command = "${MKDIR} -m " ~ conf.mode|default("755")
+%     elif type == "man"
+%       set ns.target = "${STAGEDIR}${MAN" ~  dest + "PREFIX}/man/man" ~ dest
+%       set ns.command = "@${MKDIR}"
+%     else
+%       set ns.target = into_stagedir(dest|dirname)
+%       set ns.command = "@${MKDIR}"
+%     endif
+%     if ns.target not in created
+	{{ ns.command }} {{ created.append(ns.target)|default(ns.target, True) }}
+%     endif
+%   endfor
+## next install files
+% for type,src,dest,conf in rendervars.install
 %   if type == "symlink"
-	@${MKDIR} {{ into_stagedir(dest|dirname) }}
 	${RLN} {{ into_stagedir(src) }} {{ into_stagedir(dest) }}
-%   elif type == "mkdir"
-	${MKDIR} -m {{ conf.mode|default("755") }} {{ into_stagedir(dest) }}
 %   elif type == "man"
-%     set mdest = "${MAN" ~ dest ~ "PREFIX}/" ~ "man/man" ~ dest
-	@${MKDIR} ${STAGEDIR}{{ mdest }}
-	${INSTALL_MAN} ${WRKSRC}/{{ src }} ${STAGEDIR}{{ mdest }}
+	${INSTALL_MAN} ${WRKSRC}/{{ src }} \
+	    ${STAGEDIR}${MAN{{ dest }}PREFIX}/man/man{{ dest }}
+%   elif type == "mkdir"
 %   else
-	@${MKDIR} {{ into_stagedir(dest|dirname) }}
 	{{ INSTALL_MACROS[type] }} ${WRKSRC}/{{ src }} {{ into_stagedir(dest) }}
 %   endif
 % endfor
+## last write plist entries
 % for type,src,dest,conf in rendervars.install|sort(attribute="dest", reverse=True)
 %   if type == "man"
 	@${ECHO_CMD} man/man{{ dest }}/{{ src|basename }}.gz >> ${TMPPLIST}
