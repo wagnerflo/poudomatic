@@ -10,9 +10,9 @@ USE_PYTHON=	{% block use_python %}autoplist distutils{% endblock %}
 % endblock
 
 % block post_install
-{{ super() }}
 %   block python_strip_extensions
 	@${FIND} ${STAGEDIR}${PYTHONPREFIX_SITELIBDIR} \
 	    -type f -name "*.so" -exec ${STRIP_CMD} {} +
 %   endblock
+{{ super() }}
 % endblock

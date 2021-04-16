@@ -10,6 +10,7 @@ class BlockShortcuts(Extension):
         "portrevision",
         "maintainer",
         "license",
+        "no_arch",
     ])
 
     def parse(self, parser):

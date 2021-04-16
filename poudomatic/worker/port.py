@@ -32,24 +32,6 @@ class Port:
                 collection = self.collection,
             )
 
-        with self.mark_generated(portsdir / "pkg-plist") as target:
-            with target.open("w") as fp:
-                for item in sorted(metadata.plist, key=lambda i: i.dest, reverse=True):
-                    if item.keyword:
-                        fp.write(f"{item.keyword} ")
-                    fp.write(f"{item.dest}\n")
-
-        with self.mark_generated(portsdir / "pkg-descr") as target:
-            with target.open("w") as fp:
-                descr = metadata.description or metadata.comment
-                if descr:
-                    fp.write(f"{descr.rstrip()}\n\n")
-                fp.write(f"WWW: {metadata.www or self.collection.uri}\n")
-
-        with self.mark_generated(portsdir / "distinfo") as target:
-            with target.open("w") as fp:
-                fp.write(f"TIMESTAMP = {int(time())}\n")
-
         for script,targets in metadata.scripts.items():
             if not any(targets.values()):
                 continue

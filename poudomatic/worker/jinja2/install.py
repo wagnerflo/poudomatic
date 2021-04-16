@@ -11,7 +11,6 @@ from .base import (
 )
 
 InstallItem = namedtuple("InstallItem", ("type", "src", "dest", "conf"))
-PlistItem   = namedtuple("PlistItem",   ("dest", "keyword"))
 
 class InstallExtension(DispatchParseMixin,Extension):
     tags = frozenset([
@@ -21,7 +20,6 @@ class InstallExtension(DispatchParseMixin,Extension):
     ])
 
     install = RenderVar("install", list)
-    plist = RenderVar("plist", list)
 
     def make_install(self, parser, stream, token, lineno, *args):
         return nodes.CallBlock(
@@ -124,8 +122,6 @@ class InstallExtension(DispatchParseMixin,Extension):
 
     def _install(self, tpe, src, dst, keyword, conf, caller):
         self.install.append(InstallItem(tpe, src, dst, conf))
-        if tpe not in ("man",):
-            self.plist.append(PlistItem(dst, keyword))
         return ""
 
 __all__ = (

@@ -7,5 +7,4 @@
 
 NO_BUILD=	yes
 NO_INSTALL=	yes
-NO_ARCH=	yes
 % endblock

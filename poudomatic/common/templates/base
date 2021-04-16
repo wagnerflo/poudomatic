@@ -9,6 +9,7 @@ PORTREVISION=	{% filter makevar %}{% block portrevision %}0{% endblock %}{% endf
 MAINTAINER=	{% filter makevar %}{% block maintainer %}poudomatic{% endblock %}{% endfilter %}
 COMMENT=	{% filter makevar %}{% block comment %}{% endblock %}{% endfilter %}
 LICENSE=	{% filter makevar %}{% block license %}APACHE20{% endblock %}{% endfilter %}
+NO_ARCH=	{% filter makevar %}{% block no_arch %}yes{% endblock %}{% endfilter %}
 % endblock
 
 % block options
@@ -118,6 +119,24 @@ post-patch:
 %   endblock
 % endblock
 
+DESCR=	{% block descr %}${WRKDIRPREFIX}/.pkg-descr.${PORTNAME}.${PREFIX:S/\//_/g}{% endblock %}
+
+pre-install:
+% block generate_pkg_descr
+% with
+%   set dsc = rendervars.description or rendervars.comment
+%   set www = rendervars.www or collection.uri
+	@${TOUCH} ${TOUCH_FLAGS} ${DESCR}
+%   if dsc
+%       set dsc = dsc|trim
+	@${ECHO_CMD} {{ dsc|shquote }}{{ "" if dsc[-1] in ".!?" else "." }} >> ${DESCR}
+	@${ECHO_CMD} >> ${DESCR}
+%   endif
+	@${ECHO_CMD} WWW: {{ www|shquote }} >> ${DESCR}
+% endwith
+	cat ${DESCR}
+% endblock
+
 % set INSTALL_MACROS = {
           "script": "${INSTALL_SCRIPT}",
           "binary": "${INSTALL_PROGRAM}",
@@ -125,30 +144,40 @@ post-patch:
       }
 
 %- macro into_stagedir(path)
-${STAGEDIR}
+${STAGEDIR}{{ with_prefix(path) }}
+%- endmacro
+
+%- macro with_prefix(path)
 %- if path[0] != "/"
 ${PREFIX}/
 %- endif
-{{ path|shquote }}
+{{ path }}
 %- endmacro
 
 post-install:
 % block post_install
 % for type,src,dest,conf in rendervars.install|sort(attribute="dest")
 %   if type == "symlink"
-	${MKDIR} {{ into_stagedir(dest|dirname) }}
+	@${MKDIR} {{ into_stagedir(dest|dirname) }}
 	${RLN} {{ into_stagedir(src) }} {{ into_stagedir(dest) }}
-%   elif type == "man"
-%     set mpostfix = "man/man" ~ dest
-%     set mdest = "${MAN" ~ dest ~ "PREFIX}/" ~ mpostfix
-	${MKDIR} ${STAGEDIR}/{{ mdest }}
-	${INSTALL_MAN} ${WRKSRC}/{{ src|shquote }} ${STAGEDIR}/{{ mdest }}
-	${ECHO_CMD} {{ mpostfix }}/{{ src|basename }}.gz >> ${TMPPLIST}
 %   elif type == "mkdir"
 	${MKDIR} -m {{ conf.mode|default("755") }} {{ into_stagedir(dest) }}
+%   elif type == "man"
+%     set mdest = "${MAN" ~ dest ~ "PREFIX}/" ~ "man/man" ~ dest
+	@${MKDIR} ${STAGEDIR}{{ mdest }}
+	${INSTALL_MAN} ${WRKSRC}/{{ src }} ${STAGEDIR}{{ mdest }}
 %   else
-	${MKDIR} {{ into_stagedir(dest|dirname) }}
-	{{ INSTALL_MACROS[type] }} ${WRKSRC}/{{ src|shquote }} {{ into_stagedir(dest) }}
+	@${MKDIR} {{ into_stagedir(dest|dirname) }}
+	{{ INSTALL_MACROS[type] }} ${WRKSRC}/{{ src }} {{ into_stagedir(dest) }}
+%   endif
+% endfor
+% for type,src,dest,conf in rendervars.install|sort(attribute="dest", reverse=True)
+%   if type == "man"
+	@${ECHO_CMD} man/man{{ dest }}/{{ src|basename }}.gz >> ${TMPPLIST}
+%   elif type == "mkdir"
+	@${ECHO_CMD} @dir {{ with_prefix(dest) }} >> ${TMPPLIST}
+%   else
+	@${ECHO_CMD} {{ with_prefix(dest) }} >> ${TMPPLIST}
 %   endif
 % endfor
 % endblock
