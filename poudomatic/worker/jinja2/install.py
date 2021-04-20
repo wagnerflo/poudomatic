@@ -1,6 +1,8 @@
 from collections import namedtuple
 from jinja2 import nodes
 from jinja2.ext import Extension
+from jinja2.exceptions import TemplateSyntaxError
+from jinja2.lexer import describe_token
 from jinja2_rendervars import RenderVar
 
 from .base import (
@@ -40,10 +42,16 @@ class InstallExtension(DispatchParseMixin,Extension):
     def parse_mkdir(self, parser, stream, token, lineno):
         dst = parser.parse_expression()
         conf = {}
+        conf_keys = set(("mode", "user", "group"))
 
-        if stream.current.test("name:mode"):
-            next(stream)
-            conf["mode"] = parser.parse_expression()
+        while stream.current.type != "block_end":
+            token = stream.expect("name")
+            if token.value not in conf_keys:
+                raise TemplateSyntaxError(
+                    f"unexpected token {describe_token(token)!r}",
+                    token.lineno, stream.name, stream.filename,
+                )
+            conf[token.value] = parser.parse_expression()
 
         return self.make_install(
             parser, stream, token, lineno,
