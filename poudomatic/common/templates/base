@@ -1,7 +1,7 @@
 ## -*- mode: makefile -*-
 
 % block header
-PORTNAME=	{{ portname|makevar }}
+PORTNAME=	{% filter makevar %}{% block portname %}{{ portname }}{% endblock %}{% endfilter %}
 CATEGORIES=	{{ category|makevar }}
 PORTVERSION=	{% filter makevar %}{% block portversion %}{% endblock %}{% endfilter %}
 PORTREVISION=	{% filter makevar %}{% block portrevision %}0{% endblock %}{% endfilter %}
