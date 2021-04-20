@@ -1,0 +1,26 @@
+## -*- mode: makefile -*-
+
+% extends "base"
+
+%- block portname
+{{ portname|sub("^p5-", "") }}
+%- endblock
+
+% block header
+{{ super() }}
+PKGNAMEPREFIX=	p5-
+USES=		perl5 tar:tgz
+USE_PERL5=	{% block use_perl5 %}configure{% endblock %}
+% endblock
+
+% block post_install
+{{ super() }}
+	@if [ -d ${STAGEDIR}${PACKLIST_DIR} ] ; then \
+	     ${FIND} ${STAGEDIR}${PACKLIST_DIR} -name .packlist | while read f ; do \
+	         sed -e 's|^${PREFIX}/||' \
+	             -e 's|^${SITE_MAN3_REL}/.*|&.gz|' \
+	             -e 's|^${SITE_MAN1_REL}/.*|&.gz|' \
+	             $$f >> ${TMPPLIST}; \
+	     done \
+	 fi
+% endblock

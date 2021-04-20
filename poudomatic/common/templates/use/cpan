@@ -1,0 +1,25 @@
+## -*- mode: makefile -*-
+
+% macro fetch()
+MASTER_SITES=		CPAN
+MASTER_SITE_SUBDIR=	CPAN:{{ subdir }}
+
+%   if sha3
+%     set ns = namespace()
+%     if sha3 is string
+%       set ns.sha3 = [sha3]
+%     else
+%       set ns.sha3 = sha3
+%     endif
+FETCH_DEPENDS+=		rhash:security/rhash
+${CHECKSUM_COOKIE}:
+%     for sha in ns.sha3
+	@if [ "$$(rhash -p %{sha3-224} ${_DISTDIR}/${DISTFILES:[{{ loop.index }}]})" \
+	          != "{{ sha }}" ]; then \
+	     ${ECHO_MSG} "===> Failed to verify checksum of ${DISTFILES}"; \
+	     exit 1; \
+	 fi
+%     endfor
+	@${TOUCH} ${TOUCH_FLAGS} ${CHECKSUM_COOKIE}
+%   endif
+% endmacro

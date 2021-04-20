@@ -1,6 +1,7 @@
 from itertools import count,product
 from jinja2.ext import Extension
 from pathlib import Path
+from re import sub
 from shlex import quote as shquote
 
 class FiltersExtension(Extension):
@@ -17,6 +18,7 @@ class FiltersExtension(Extension):
             basename = self._basename,
             makevar = self._makevar,
             heredoc = self._heredoc,
+            sub = self._sub,
         )
 
     def _shquote(self, arg):
@@ -43,6 +45,9 @@ class FiltersExtension(Extension):
                 word = ''.join(word)
                 if word not in arg:
                     return f"'{word}'\n{arg}{word}"
+
+    def _sub(self, val, pattern, repl):
+        return sub(pattern, repl, val)
 
 __all__ = (
     "FiltersExtension",

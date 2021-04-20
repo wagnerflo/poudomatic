@@ -2,6 +2,10 @@
 
 % extends "base"
 
+%- block portname
+{{ portname|sub("^py-", "") }}
+%- endblock
+
 % block header
 {{ super() }}
 PKGNAMEPREFIX=	${PYTHON_PKGNAMEPREFIX}
