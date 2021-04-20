@@ -134,7 +134,6 @@ pre-install:
 %   endif
 	@${ECHO_CMD} WWW: {{ www|shquote }} >> ${DESCR}
 % endwith
-	cat ${DESCR}
 % endblock
 
 % set INSTALL_MACROS = {
