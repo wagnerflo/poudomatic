@@ -11,7 +11,9 @@ if ! ${PW} usershow {{ login }} >/dev/null 2>&1; then
     ${PW} useradd \
           -n {{ login }} \
           -u {{ userconf.uid }} -g {{ userconf.gid }} \
+% if userconf.groups
           -G {{ userconf.groups|join(",") }} \
+% endif
           -c "{{ userconf.gecos }}" \
           -d {{ userconf.home }} \
           -s {{ userconf.shell }}
