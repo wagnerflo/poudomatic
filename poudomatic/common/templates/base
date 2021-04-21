@@ -27,7 +27,7 @@ PKG_NOTE_poudomatic_gitsha=	{{ collection.gitsha|makevar }}
 
 %- macro with_modifier(dep, modifier)
 %-   if modifier == "python"
-${PYTHON_PKGNAMEPREFIX}{{ dep }}@${PY_FLAVOR}
+${PYTHON_PKGNAMEPREFIX}{{ dep|sub("^py-", "") }}@${PY_FLAVOR}
 %-   else
 {{ dep }}
 %-   endif
