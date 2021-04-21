@@ -37,6 +37,9 @@ ${PYTHON_PKGNAMEPREFIX}{{ dep }}@${PY_FLAVOR}
 %   for dep in rendervars.depends.run_depends
 RUN_DEPENDS+=	{{ with_modifier(dep.DEPENDS, dep.modifier)|makevar }}
 %   endfor
+%   for dep in rendervars.depends.build_depends
+BUILD_DEPENDS+=	{{ with_modifier(dep.DEPENDS, dep.modifier)|makevar }}
+%   endfor
 % endblock
 
 % block users
