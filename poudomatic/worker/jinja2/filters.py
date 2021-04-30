@@ -19,6 +19,7 @@ class FiltersExtension(Extension):
             makevar = self._makevar,
             heredoc = self._heredoc,
             sub = self._sub,
+            as_list = self._as_list,
         )
 
     def _shquote(self, arg):
@@ -48,6 +49,12 @@ class FiltersExtension(Extension):
 
     def _sub(self, val, pattern, repl):
         return sub(pattern, repl, val)
+
+    def _as_list(self, val):
+        if isinstance(val, list):
+            return val
+        else:
+            return [val]
 
 __all__ = (
     "FiltersExtension",

@@ -1,0 +1,22 @@
+## -*- mode: makefile -*-
+
+%- macro check_sha3(hashes)
+%-   for sha in hashes|as_list
+	@if [ $$(openssl sha3-224 ${_DISTDIR}/${DISTFILES:[{{ loop.index }}]} | \
+	             tail -c57) != "{{ sha }}" ]; then \
+	     ${ECHO_MSG} "===> Failed to verify checksum of ${DISTFILES}"; \
+	     exit 1; \
+	 fi
+%    endfor
+%- endmacro
+
+%- macro check_blake2b(hashes, length, algo="blake2b")
+%    for b2 in hashes|as_list
+	@if [ $$(b2sum -a {{ algo }} -l {{ length }} \
+	             ${_DISTDIR}/${DISTFILES:[{{ loop.index }}]} | cut -d" " -f1) \
+	          != "{{ b2 }}" ]; then \
+	     ${ECHO_MSG} "===> Failed to verify checksum of ${DISTFILES}"; \
+	     exit 1; \
+	 fi
+%    endfor
+%- endmacro

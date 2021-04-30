@@ -1,21 +1,33 @@
 ## -*- mode: makefile -*-
 
 % import "common/gnupg" as gnupg
+% import "common/hash" as hash
 
 % macro fetch()
 MASTER_SITES=		CHEESESHOP
 EXTRACT_ONLY=		${DISTNAME}${EXTRACT_SUFX}
 DISTFILES=		${EXTRACT_ONLY}
 
-%   if verify
+%   if verify is defined
 FETCH_DEPENDS+=		gpg2:security/gnupg
 DISTFILES+=		${EXTRACT_ONLY}.asc
+%   elif blake is defined
+FETCH_DEPENDS+=		b2sum:sysutils/b2sum
+%   endif
 ${CHECKSUM_COOKIE}:
+%   if verify is defined
 %     call(gpg, gpghome) gnupg.recv(verify)
 	@for file in ${DISTFILES:M*.asc:S/.asc$//g}; do \
 	     {{ gpg }} --verify ${_DISTDIR}/$${file}.asc ${_DISTDIR}/$${file}; \
 	 done
 %     endcall
-	@${TOUCH} ${TOUCH_FLAGS} ${CHECKSUM_COOKIE}
+%   else
+%     if blake is defined
+{{ hash.check_blake2b(blake, 256) }}
+%     endif
+%     if sha3 is defined
+{{ hash.check_sha3(sha3) }}
+%     endif
 %   endif
+	@${TOUCH} ${TOUCH_FLAGS} ${CHECKSUM_COOKIE}
 % endmacro
