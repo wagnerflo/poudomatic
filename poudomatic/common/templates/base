@@ -10,6 +10,13 @@ MAINTAINER=	{% filter makevar %}{% block maintainer %}poudomatic{% endblock %}{%
 COMMENT=	{% filter makevar %}{% block comment %}{% endblock %}{% endfilter %}
 LICENSE=	{% filter makevar %}{% block license %}APACHE20{% endblock %}{% endfilter %}
 NO_ARCH=	{% filter makevar %}{% block no_arch %}yes{% endblock %}{% endfilter %}
+% block implicit_uses_python
+% for dep in rendervars.depends.run_depends + rendervars.depends.build_depends if dep.modifier == "python"
+_USES_PYTHON?=	python:3.6+,build
+USES+=		${_USES_PYTHON}
+% break
+% endfor
+% endblock
 % endblock
 
 % block options

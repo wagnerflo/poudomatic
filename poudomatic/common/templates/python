@@ -6,6 +6,9 @@
 {{ portname|sub("^py-", "") }}
 %- endblock
 
+% block implicit_uses_python
+% endblock
+
 % block header
 {{ super() }}
 PKGNAMEPREFIX=	${PYTHON_PKGNAMEPREFIX}

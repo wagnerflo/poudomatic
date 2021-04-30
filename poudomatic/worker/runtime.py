@@ -23,6 +23,7 @@ class BaseRuntime(ABC):
                 RenderVarsExtension,
                 ScriptExtension,
                 UseExtension,
+                "jinja2.ext.loopcontrols",
             ),
             autoescape = False,
             line_statement_prefix = '%',
