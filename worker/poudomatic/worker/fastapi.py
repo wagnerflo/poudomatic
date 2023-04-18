@@ -31,9 +31,16 @@ async def build(request: Request,
     return "ok"
 
 @app.put("/ports/{task_id}")
-async def build(request: Request,
+async def ports(request: Request,
                 task_id: str = TASK_ID_Path,
                 item: UpdatePortsTask = Body()):
+    await request.app.store.enqueue(task_id, item)
+    return "ok"
+
+@app.put("/jail/{task_id}")
+async def jail(request: Request,
+               task_id: str = TASK_ID_Path,
+               item: CreateJailTask = Body()):
     await request.app.store.enqueue(task_id, item)
     return "ok"
 
