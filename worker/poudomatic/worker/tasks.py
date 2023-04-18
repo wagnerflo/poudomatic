@@ -78,7 +78,7 @@ class UpdatePortsTask(Model):
         else:
             uri = env.get_config("portstree", "uri")
             branchformat = env.get_config("portstree", "branchformat")
-            branchname = branchformat.format(branch=self.branch)
+            branchname = branchformat.format(branch=self.branch.name)
 
             with zfs.temp_dataset(env.dset_ports) as dset:
                 prefix,_,_ = dset.name.rpartition("/")
