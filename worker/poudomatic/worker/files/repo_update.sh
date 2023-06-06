@@ -66,11 +66,17 @@ pkg_equal () {
     do
         r1=$(${PKG_PRINTF} "$1" "${query}")
         r2=$(${PKG_PRINTF} "$2" "${query}")
-        [ "${r1}" != "${r2}" ] && return 1
+        if [ "${r1}" != "${r2}" ]; then
+            msg "===> difference found in pkg_printf(3) query ${query}"
+            return 1
+        fi
     done
     r1=$(pkg_get_files "$1")
     r2=$(pkg_get_files "$2")
-    [ "${r1}" != "${r2}" ] && return 1
+    if [ "${r1}" != "${r2}" ]; then
+        msg "===> difference found in file list"
+        return 1
+    fi
     return 0
 }
 

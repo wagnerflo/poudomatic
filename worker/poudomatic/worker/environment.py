@@ -1,12 +1,13 @@
 from configparser import ConfigParser
 from contextlib import contextmanager
 from pathlib import Path
-from shutil import copyfile
-from tempfile import TemporaryDirectory
 
-from .util import zfs
 from .poudriere import Poudriere
+from .storage import Storage
+from .util import zfs
 from .versions import *
+
+MISSING = object()
 
 class Environment:
     PROPERTY = "poudomatic:environment"
@@ -26,7 +27,7 @@ class Environment:
         ( "wrkdirs",   None            ),
     )
 
-    def __init__(self, dataset):
+    def __init__(self, dataset, no_setup=False):
         if (dset := zfs.get_dataset(dataset)) is None:
             raise Exception(f"ZFS dataset '{dataset}' doesn't exist.")
 
@@ -38,29 +39,40 @@ class Environment:
 
         self.dset = dset
         self.path = Path(dset.mountpoint)
+        self.etc_path = self.path / "etc"
+        self.db_path = self.etc_path / "taskdb" / "taskdb.sqlite"
 
         if (version := zfs.get_property(dset, self.PROPERTY)) is None:
+            if no_setup:
+                raise Exception()
             self.setup()
         else:
-            self.upgrade(int(version))
+            for ver in range(int(version) + 1, self.VERSION + 1):
+                if no_setup:
+                    raise Exception()
+                getattr(self, f"upgrade_to_{ver}")()
 
         self.dset_jails = zfs.get_dataset(f"{dataset}/jails")
         self.dset_ports = zfs.get_dataset(f"{dataset}/ports")
         self.dset_pkgs = zfs.get_dataset(f"{dataset}/packages")
         self.dset_src = zfs.get_dataset(f"{dataset}/src")
-        self.etc_path = self.path / "etc"
         self.packages_path = Path(
             zfs.get_dataset(f"{dataset}/packages").mountpoint
         )
 
-    def get_config(self, section, key):
+        self._storage = Storage(self.db_path)
+
+    def get_config(self, section, key, default=MISSING):
         conf = ConfigParser(
             interpolation=None,
             strict=False,
             empty_lines_in_values=False,
         )
         conf.read(self.etc_path / "poudomatic.conf")
-        return conf.get(section, key)
+        if default is MISSING:
+            return conf.get(section, key)
+        else:
+            return conf.get(section, key, fallback=default)
 
     def setup(self):
         if list(self.dset.children):
@@ -88,17 +100,33 @@ class Environment:
             "poudriere:type": "data",
         })
 
-    def upgrade(self, old_version):
-        for ver in range(old_version + 1, self.VERSION + 1):
-            getattr(self, f"upgrade_to_{ver}")()
+        # create database folder
+        db_dir = self.db_path.parent()
+
+    @property
+    def storage(self):
+        return self._storage
 
     def get_poudriere(self, task_id):
         return Poudriere(self.dset, task_id)
 
-    def get_ports(self, branch):
+    def list_portsbranches(self):
+        for dset in self.dset_ports.children:
+            try:
+                _,_,name = dset.name.rpartition("/")
+                yield PortsBranchVersion.parse_str(name).name
+            except:
+                pass
+
+    def get_portsbranch(self, branch):
         dset = f"{self.dset_ports.name}/{branch.name}"
         if snap := zfs.get_newest_snapshot(dset):
             return PortsTree(snap)
+
+    def list_jails(self):
+        for dset in self.dset_jails.children:
+            _,_,name = dset.name.rpartition("/")
+            yield FreeBSDVersion.parse_str(name).shortname
 
     def get_jail(self, version):
         dset = f"{self.dset_jails.name}/{version.shortname}"

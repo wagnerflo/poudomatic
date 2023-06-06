@@ -1,28 +1,43 @@
-import click
-from ..api import API
+from click import command, option, argument, echo
+from click.decorators import pass_meta_key
 
-@click.command()
-@click.option("--nowait", is_flag=True, help="...")
-@click.option("--portja", multiple=True)
-@click.argument("jail_version")
-@click.argument("ports_branch")
-@click.argument("origins", nargs=-1)
-def build(jail_version, ports_branch, origins, portja, nowait):
-    api = API()
-    task_id = api.generate_task_id()
-    resp,data = api.req("PUT", f"build/{task_id}", {
-        "jail_version": jail_version,
-        "ports_branch": ports_branch,
-        "origins": origins,
-        "portja_targets": portja,
-    })
-    if resp.status != 200:
-        click.echo(data)
-        return
+@command()
+@option("--nowait", is_flag=True, help="...")
+@option("--repo", multiple=True)
+@argument("jail_version")
+@argument("ports_branch")
+@argument("origins", nargs=-1)
+@pass_meta_key("client")
+def build(client, jail_version, ports_branch, origins, repo, nowait):
+    task_id = client.build(jail_version, ports_branch, origins, repo)
 
     if nowait:
         click.echo(task_id)
         return
 
-    # todo
-    click.echo(task_id)
+    for endpoint,msg in client.follow_log(task_id):
+        if msg.get("origin") is None:
+            echo(msg["msg"])
+
+    origins = set()
+    for result in client.get_result(task_id).values():
+        if result["status"] == "success":
+            origins.update(result["detail"].values())
+
+    echo()
+
+    if not origins:
+        echo("No packages were built.")
+    else:
+        echo("To retrieve package build logs use:")
+        for origin in sorted(origins):
+            echo(f"  poudomatic buildlog {task_id} {origin}")
+
+@command()
+@argument("task_id")
+@argument("origin", required=False)
+@pass_meta_key("client")
+def buildlog(client, task_id, origin):
+    for endpoint,msg in client.follow_log(task_id):
+        if msg.get("origin") == origin:
+            echo(msg["msg"])

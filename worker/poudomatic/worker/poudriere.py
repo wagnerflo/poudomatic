@@ -13,9 +13,12 @@ from .util import (
 )
 from . import files
 
-BulkStats = namedtuple("BulkStats", (
+PkgDeps = namedtuple("PkgDeps", (
     "pkgmap",
     "depends",
+))
+
+BulkStats = namedtuple("BulkStats", (
     "built"
 ))
 
@@ -49,6 +52,17 @@ class Poudriere:
 
     def __exit__(self, ex_type, ex_value, ex_tb):
         self.path.cleanup()
+        for root,dirs,files in walk_dir(self.path_logs):
+            root = Path(root)
+            for item in { "assets", ".html", "latest-per-pkg",
+                          self.task_id }.intersection(dirs):
+                rmtree(root / item)
+                dirs.remove(item)
+            for item in { ".data.json", ".data.mini.json", "index.html",
+                          "build.html", "robots.txt", }.intersection(files):
+                (root / item).unlink()
+            for item in { "latest", "latest-done" }.intersection(dirs):
+                (root / item).unlink()
 
     def __call__(self, *args):
         return process(*self.cmd + args)
@@ -87,55 +101,63 @@ class Poudriere:
         finally:
             self("jail", "-k", "-j", jailname, "-p", portstree).run()
 
-    def bulk(self, *args, logger):
+    def bulk(self, *args, logfunc=None):
         errors = []
         try:
             with self("bulk", *args) as proc:
                 for line in proc:
                     line = line.rstrip()
-                    if logger:
-                        logger.info(line)
+                    if logfunc:
+                        logfunc(line)
                     _,_,msg = line.partition("Error: ")
                     if msg:
                         errors.append(msg)
         except CommandError:
             return errors
 
-    def clean_logs(self, with_task=False):
-        for root,dirs,files in walk_dir(self.path_logs):
-            root = Path(root)
-            for item in { self.task_id if with_task else None, "assets",
-                          ".html", "latest-per-pkg" }.intersection(dirs):
-                rmtree(root / item)
-                dirs.remove(item)
-            for item in { ".data.json", ".data.mini.json", "index.html",
-                          "build.html", "robots.txt", }.intersection(files):
-                (root / item).unlink()
-            for item in { "latest", "latest-done" }.intersection(dirs):
-                (root / item).unlink()
+    def get_logbase(self, jail, portsbranch):
+        return (
+            self.path_logs / "bulk" / f"{jail}-{portsbranch}" /
+            self.task_id
+        )
 
-    def read_bulk_stats(self):
-        base = next(self.path_logs.glob(f"bulk/*/{self.task_id}"))
+    def get_buildlogbase(self, jail, portsbranch):
+        return self.get_logbase(jail, portsbranch) / "logs"
+
+    def read_pkg_deps(self , jail, portsbranch):
+        base = self.get_logbase(jail, portsbranch)
+        all_pkgs = base / ".poudriere.all_pkgs%"
+        pkg_deps = base / ".poudriere.pkg_deps%"
+
         pkgmap = {}
         depends = defaultdict(set)
+
+        if all_pkgs.exists() and pkg_deps.exists():
+            with all_pkgs.open() as fp:
+                for line in fp:
+                    pkg,origin,*_ = line.strip().split()
+                    pkgmap[pkg] = origin
+
+            with pkg_deps.open() as fp:
+                for line in fp:
+                    pkg,dep = line.strip().split()
+                    depends[pkgmap[pkg]].add(pkgmap[dep])
+
+        return PkgDeps(pkgmap, dict(depends))
+
+    def read_bulk_stats(self, jail, portsbranch):
+        base = self.get_logbase(jail, portsbranch)
+        ports_built = base / ".poudriere.ports.built"
+
         built = set()
 
-        with (base / ".poudriere.all_pkgs%").open() as fp:
-            for line in fp:
-                pkg,origin,*_ = line.strip().split()
-                pkgmap[pkg] = origin
+        if ports_built.exists():
+            with ports_built.open() as fp:
+                for line in fp:
+                    _,pkg,*_ = line.strip().split()
+                    built.add(pkg)
 
-        with (base / ".poudriere.pkg_deps%").open() as fp:
-            for line in fp:
-                pkg,dep = line.strip().split()
-                depends[pkgmap[pkg]].add(pkgmap[dep])
-
-        with (base / ".poudriere.ports.built").open() as fp:
-            for line in fp:
-                _,pkg,*_ = line.strip().split()
-                built.add(pkg)
-
-        return BulkStats(pkgmap, dict(depends), built)
+        return BulkStats(built)
 
 class PoudriereJail:
     def __init__(self, name):

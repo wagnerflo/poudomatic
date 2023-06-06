@@ -4,7 +4,6 @@ import sys
 import time
 
 from .environment import Environment
-from .storage import Storage
 
 def main():
     try:
@@ -20,7 +19,7 @@ def main():
         args = parser.parse_args()
         env = Environment(args.dataset)
 
-        with Storage(env.etc_path / "taskdb" / "taskdb.sqlite") as stor:
+        with env.storage as stor:
             while True:
                 if task := stor.start_next_task():
                     task_id,task = task
@@ -28,7 +27,7 @@ def main():
                     try:
                         res = {
                             "status": "success",
-                            "result": task.run(env, task_id),
+                            "detail": task.run(env, task_id),
                         }
                         logging.info(f"Task {task_id} completed successfully.")
                     except KeyboardInterrupt:
@@ -39,7 +38,7 @@ def main():
                     finally:
                        stor.end_task(task_id, res)
                 else:
-                    time.sleep(5)
+                    stor.wait_for_changes()
 
     except KeyboardInterrupt:
         return

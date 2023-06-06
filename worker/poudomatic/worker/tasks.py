@@ -1,15 +1,16 @@
 from collections import defaultdict
 from contextlib import contextmanager
 from logging import getLogger
-from multiprocessing.pool import ThreadPool
+from concurrent.futures import ThreadPoolExecutor, wait
 from pathlib import Path
 from pydantic import BaseModel, Field
+from re import compile as regex
 from shutil import copyfile
 from typing import Literal, Optional, Union
 
 from . import files
 from .srctree import SourceTree
-from .util import zfs,git,process
+from .util import zfs,git,process,DirectoryFollower
 from .versions import *
 
 
@@ -60,9 +61,7 @@ class UpdatePortsTask(Model):
     branch: PortsBranchVersion
 
     def run(self, env, task_id):
-        log = getLogger("update_ports")
-
-        if (ports := env.get_ports(self.branch)) is not None:
+        if (ports := env.get_portsbranch(self.branch)) is not None:
             snap = ports.snap
             dset = snap.parent
 
@@ -89,15 +88,15 @@ class UpdatePortsTask(Model):
                     timestamp = repo.head.commit.committed_date
 
                 zfs.create_snapshot(dset, timestamp)
-                zfs.rename_dataset(dset, f"{prefix}/{self.version.name}")
+                zfs.rename_dataset(dset, f"{prefix}/{self.branch.name}")
 
-        return env.get_ports(self.branch)
+        return env.get_portsbranch(self.branch)
 
 
 @contextmanager
-def prepare_build(env, task_id, log, jail_version, ports_branch, targets):
+def prepare_build(env, task_id, logfunc, jail_version, ports_branch, targets):
     jail = env.get_jail(jail_version)
-    ports = env.get_ports(ports_branch)
+    ports = env.get_portsbranch(ports_branch)
     makeconf = env.etc_path / f"{jail.name}-{ports.name}-make.conf"
 
     with ( env.get_poudriere(task_id) as pourdiere,
@@ -119,7 +118,7 @@ def prepare_build(env, task_id, log, jail_version, ports_branch, targets):
             process(
                 "portja",
                 portsdir, pourdiere.path_make_conf, *targets
-            ) >> log.info
+            ) >> logfunc
 
             # find which ports were generated
             try:
@@ -135,8 +134,20 @@ class RunBuildTask(Model):
     portja_targets: list[str]
     origins: list[str]
 
+    END_PKG = regex(r"build time: .{8}")
+
     def run(self, env, task_id):
         log = getLogger("run_build")
+        stor = env.storage
+
+        def log_progress(line, origin=None):
+            if origin is None:
+                log.info(line)
+            stor.add_log(task_id, {
+                "type": "log",
+                "msg": line,
+                "origin": origin,
+            })
 
         jail_version = self.jail_version
         ports_branch = self.ports_branch
@@ -144,7 +155,8 @@ class RunBuildTask(Model):
         origins = self.origins
         packages = env.get_packages(jail_version, ports_branch)
 
-        with ( prepare_build(env, task_id, log, jail_version, ports_branch, targets)
+        with ( prepare_build(env, task_id, log_progress, jail_version,
+                             ports_branch, targets)
                  as (generated, pourdiere, jail, portstree),
                packages.transaction() ):
 
@@ -153,34 +165,54 @@ class RunBuildTask(Model):
 
             # only continue if we have ports to build
             if not origins:
-                log.info("No ports to build.")
+                log_progress("No ports to build.")
                 return
 
-            with ThreadPool(1) as pool:
+            jname = jail.name
+            pname = portstree.name
+            pkgdeps = None
+
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                buildlogs = pourdiere.get_buildlogbase(jname, pname)
+                buildlogs.mkdir(parents=True)
+                follow = DirectoryFollower(buildlogs)
+
                 # start pourdiere in thread
-                result = pool.apply_async(
-                    pourdiere.bulk,
-                    ("-j", jail.name, "-p", portstree.name, "-N", *origins),
-                    dict(logger=log)
-                )
+                def run():
+                    pourdiere.bulk(
+                        "-j", jname, "-p", pname, "-N", *origins,
+                        logfunc=log_progress
+                    )
+                    follow.close()
 
-                # TODO: watch files in main thread
-                # ...
+                pool.submit(run)
 
-                errors = result.get()
+                # watch files in main thread
+                for filename,line in follow:
+                    if pkgdeps is None:
+                        pkgdeps = pourdiere.read_pkg_deps(jname, pname)
 
-            pourdiere.clean_logs()
-            stats = pourdiere.read_bulk_stats()
+                    log_progress(
+                        line.rstrip(),
+                        origin=pkgdeps.pkgmap[filename.with_suffix("").name]
+                    )
+
+                    if self.END_PKG.match(line):
+                        follow.remove(filename)
+
+            stats = pourdiere.read_bulk_stats(jname, pname)
+            if pkgdeps is None:
+                pkgdeps = pourdiere.read_pkg_deps(jname, pname)
 
             # only continue if packages were built
             if not stats.built:
-                return
+                return {}
 
             pkglist = " ".join(stats.built)
-            log.info(f"Packages built: {pkglist}")
+            log_progress(f"Packages built: {pkglist}")
 
             # start jail, mount repository into it, run update script
-            with ( pourdiere.jail(jail.name, portstree.name) as pj,
+            with ( pourdiere.jail(jname, pname) as pj,
                    mount_nullfs(packages.mountpoint, pj.path / "pkg") ):
                 script = files.read_template(
                     "repo_update.sh",
@@ -188,7 +220,17 @@ class RunBuildTask(Model):
                     pkg_latest_c=files.read("pkg_latest.c"),
                     packages=pkglist,
                 )
-                pj.exec("/bin/sh", "-s") << script >> log.info
+                pj.exec("/bin/sh", "-s") << script >> log_progress
+
+            # run the post change script
+            script = env.get_config(
+                "repositories", "post_change_script", default=None)
+            if script is not None:
+                process(
+                    script, packages.mountpoint / "repo", jname, pname
+                ) >> log_progress
+
+            return { pkg: pkgdeps.pkgmap[pkg] for pkg in stats.built }
 
 @contextmanager
 def mount_nullfs(src, tgt):
@@ -219,12 +261,9 @@ class GetDependsTask(Model):
                 logger=log
             )
             if errors:
-                pourdiere.clean_logs(with_task=True)
                 raise Exception("; ".join(errors))
 
-        stats = pourdiere.read_bulk_stats()
-        pourdiere.clean_logs(with_task=True)
-        return stats.depends
+        return pourdiere.read_bulk_stats().depends
 
 
 __all__ = (
